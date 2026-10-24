@@ -282,7 +282,7 @@
   body.noting #app .topbar{ top:var(--note-h); }
   body.noting .chat-overlay, body.noting .settings-screen{ top:var(--note-h); }
   body.noting .modal.full{ top:var(--note-h); height:calc(100% - var(--note-h)); max-height:calc(100% - var(--note-h)); }
-  body.noting .form-full{ max-height:calc(100% - var(--note-h) - 8px); }
+  body.noting .form-full{ top:var(--note-h); height:calc(100% - var(--note-h)); }
   /* ---- v49: iskačući prozori gore, ispod zamrznutog zaglavlja (--pop-top meri updatePopTop) ---- */
   .modal-backdrop .modal:not(.full):not(.form-full){ top:var(--pop-top); transform:translateX(-50%); max-height:calc(100% - var(--pop-top) - 16px); padding-bottom:22px; }
   .home-sheet-bg{ align-items:flex-start; padding-top:var(--pop-top); box-sizing:border-box; }
@@ -586,14 +586,14 @@ input:focus, textarea:focus, select:focus{ outline:1.5px solid var(--focus-line)
 :is(.search-wrap, .entry-input-wrap) :is(input,textarea):focus{ outline:none !important; }
 .search-wrap:focus-within, .entry-input-wrap:focus-within{ box-shadow:0 0 0 1.5px var(--focus-line) !important; }
 input::selection, textarea::selection{ background:color-mix(in srgb, var(--frame-acc) 40%, transparent); }
-/* v5: obrazac kao u Stanju guma — prozor odozdo preko zasenčenog ekrana; naslov (i Obriši) gore, dugmad dole, polja se listaju između.
-   Tastatura smanjuje prozor (interactive-widget=resizes-content), pa prozor uvek stoji iznad nje. */
-#formBackdrop{ align-items:flex-end; }
-.modal.form-full{ position:fixed; top:auto; bottom:0; left:0; right:0; margin:0 auto; transform:none; width:100%; max-width:520px; height:auto; max-height:90%; border-radius:18px 18px 0 0; padding:0; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 -10px 30px rgba(0,0,0,.28); border-bottom:none !important; animation:ffUp .22s ease; }
-@keyframes ffUp{ from{ transform:translateY(100%); } to{ transform:translateY(0); } }
-.form-full .ff-head{ flex:none; display:flex; align-items:center; gap:10px; padding:14px 14px 12px 18px; border-bottom:1px solid var(--line); }
+/* v7: izmena/novi termin PREKO CELOG EKRANA (Zoran 24.10.: preglednije); ponašanje polja ostaje iz Stanja guma (v5).
+   Naslov (i Obriši) gore, dugmad dole, polja se listaju između; tastatura smanjuje prozor (interactive-widget=resizes-content). */
+.modal.form-full{ position:fixed; top:0; bottom:0; left:0; right:0; margin:0 auto; transform:none; width:100%; max-width:520px; height:100%; max-height:none; border-radius:0; padding:0; display:flex; flex-direction:column; overflow:hidden; box-shadow:none; border-top:none !important; border-bottom:none !important; }
+.form-full .ff-head{ flex:none; display:flex; align-items:center; gap:10px; padding:calc(14px + env(safe-area-inset-top,0px)) 14px 12px 18px; border-bottom:1px solid var(--line); }
 .form-full .ff-head h2{ flex:1; min-width:0; margin:0; padding:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .form-full .ff-head .modal-close-x{ position:static; flex:none; width:36px; height:36px; }
+/* strelica na tastaturi posle poslednjeg polja stane na Sačuvaj: jasno uokvireno, dodir čuva */
+.form-full .ff-foot .save-btn:focus{ outline:3px solid var(--focus-line, var(--green-deep)) !important; outline-offset:3px; }
 .form-full .ff-del{ flex:none; height:36px; padding:0 14px; border-radius:18px; border:1px solid color-mix(in srgb, var(--coral) 55%, transparent); background:color-mix(in srgb, var(--coral) 14%, transparent); color:var(--coral); font-size:14px; font-weight:700; font-family:inherit; cursor:pointer; }
 .form-full .ff-body{ flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:16px 18px 10px; }
 .form-full .ff-foot{ flex:none; margin:0; padding:12px 16px calc(14px + env(safe-area-inset-bottom)); border-top:1px solid var(--line); }
@@ -610,6 +610,11 @@ input::selection, textarea::selection{ background:color-mix(in srgb, var(--frame
 .tel-row .tel-btn{ flex:none; width:46px; border-radius:11px; border:1px solid var(--line); background:var(--bg-elevated); color:var(--text); font-size:19px; display:flex; align-items:center; justify-content:center; text-decoration:none; cursor:pointer; padding:0; }
 /* predlog redosleda u polju za unos (kao kartica): sitnije, da stane u jedan red */
 #manualInput::placeholder{ font-size:13px; letter-spacing:-.1px; }
+/* v7: dok je polje otvoreno, podsetnik redosleda stoji u dnu i ne nestaje dok se kuca/diktira */
+.mi-hint{ display:none; position:absolute; left:14px; right:14px; bottom:8px; padding-top:7px; border-top:1px dashed color-mix(in srgb, var(--text-dim) 45%, transparent); font-size:13px; line-height:17px; color:var(--text-dim); pointer-events:none; }
+body:not(.mi-rest) .entry-row-input:focus-within .mi-hint{ display:block; }
+body:not(.mi-rest) .entry-row-input:focus-within textarea{ padding-bottom:40px; }
+body:not(.mi-rest) .entry-row-input:focus-within textarea::placeholder{ color:transparent; }
 .zg-meta a.tel-link{ color:inherit; text-decoration:underline; text-underline-offset:2px; }
 .rok-pick{ display:flex; gap:10px; }
 .rok-pick select:first-child{ flex:1.5; min-width:0; }
@@ -1324,6 +1329,7 @@ function render(){
     '<div class="entry-row entry-row-input">'+
     '<div class="entry-input-wrap">'+
     '<textarea id="manualInput" rows="1" enterkeyhint="send" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Dan, vreme, ime, auto, prečnik, iznos, napomena, telefon" onkeydown="if(event.key===\'Enter\'){ event.preventDefault(); submitManualText(); }"></textarea>'+
+    '<div class="mi-hint">Dan, vreme, ime, auto, prečnik, iznos, napomena, telefon</div>'+
     '</div></div>'+
     '<div class="entry-row entry-row-actions">'+
     '<button class="send-btn" '+(isProcessing?'disabled':'')+' onmousedown="event.preventDefault()" onclick="submitManualText()">'+(isProcessing?'<span class="ai-spinner"></span>':ic('➤','send'))+'</button>'+
@@ -1377,7 +1383,7 @@ function confirmDeleteItem(id, swapFromFn){
 }
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 6; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 7; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -1878,8 +1884,8 @@ function renderItemForm(){
   let b = document.getElementById('formBackdrop');
   const isNew = !b;
   if(isNew){ b = document.createElement('div'); b.className='modal-backdrop'; b.id='formBackdrop'; }
-  /* strelica (Enter) na tastaturi = Sačuvaj (Zoran 23.10.) */
-  const F = 'autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" onkeydown="formEnterKey(event)"';
+  /* strelica (Enter) na tastaturi = sledeće polje; posle poslednjeg stane na Sačuvaj, a čuva tek dodir (Zoran 24.10., umesto v3 „Enter = Sačuvaj“) */
+  const F = 'autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next" onkeydown="formEnterKey(event)"';
   const v = k=> escapeHtml(formDraft[k]==null ? '' : formDraft[k]);
   const analyzingHtml = formAnalyzing ? '<div class="ai-analyzing"><span class="ai-spinner"></span> AI čita podatke...</div>' : '';
   const oldBody = b.querySelector('.ff-body'); const keepScroll = oldBody ? oldBody.scrollTop : 0;
@@ -1910,7 +1916,7 @@ function renderItemForm(){
     '</div>'+
     '<div class="modal-actions ff-foot">'+
     '<button class="cancel-btn" onclick="closeItemForm()">Otkaži</button>'+
-    '<button class="save-btn" onclick="saveItemForm()">Sačuvaj</button>'+
+    '<button class="save-btn" id="ffSave" onclick="saveItemForm()">Sačuvaj</button>'+
     '</div></div>';
   if(keepScroll){ const nb = b.querySelector('.ff-body'); if(nb) nb.scrollTop = keepScroll; }
 
@@ -1922,11 +1928,16 @@ function renderItemForm(){
   wireFormFields();
   refreshMissMarks();
 }
+const FORM_ORDER = ['fIme','fAuto','fDimR','fIznos','fNapomena','fTel'];
 function formEnterKey(e){
   if(e.key !== 'Enter' || e.isComposing) return;
   e.preventDefault();
+  const i = FORM_ORDER.indexOf(e.target && e.target.id);
+  const next = i >= 0 && i < FORM_ORDER.length-1 ? document.getElementById(FORM_ORDER[i+1]) : null;
+  if(next){ next.focus(); return; }
+  const sv = document.getElementById('ffSave');
   if(e.target && e.target.blur) e.target.blur();
-  saveItemForm();
+  if(sv) sv.focus();
 }
 function closeItemForm(){
   if(formCloseFn){ closeOverlay(formCloseFn); formCloseFn = null; }
@@ -2278,11 +2289,11 @@ let helpCloseFn = null;
 function openHelpScreen(){
   const b = document.createElement('div'); b.className='modal-backdrop top'; b.id='helpBackdrop';
   const sections = [
-    { t:'Unos termina', c:'Dole u polje ukucaj ili izgovori termin (mikrofon na tastaturi), npr. "sutra u 10 Petar Petrović, Golf 7, R16, 4500, doneće svoje gume, telefon 064 123 45 67" (redosled kao na kartici, piše i u praznom polju), pa dugme za slanje ili Enter. Polje se raširi dok pišeš. AI sam rasporedi podatke i termin se odmah sačuva; gore piše šta je sačuvano, a nova kartica kratko zasija. AI razume danas, sutra, prekosutra, "u petak", "u pola 11" (10:30).' },
+    { t:'Unos termina', c:'Dole u polje ukucaj ili izgovori termin (mikrofon na tastaturi), npr. "sutra u 10 Petar Petrović, Golf 7, R16, 4500, doneće svoje gume, telefon 064 123 45 67" (redosled kao na kartici; dok kucaš, podsetnik stoji u dnu polja), pa dugme za slanje ili Enter. Polje se raširi dok pišeš. AI sam rasporedi podatke i termin se odmah sačuva; gore piše šta je sačuvano, a nova kartica kratko zasija. AI razume danas, sutra, prekosutra, "u petak", "u pola 11" (10:30).' },
     { t:'Ispravka', c:'Dodir na karticu odmah otvara izmenu (prozor odozdo); gore uz ime je "Obriši" (termin ide u korpu). Polja koja nisu uneta imaju crven naziv. Dug pritisak (drži prst) na kartici otvara brzi meni: Izmeni ili Obriši.' },
     { t:'Kad nešto nedostaje', c:'Datum, vreme i ime su obavezni. Ako AI ne prepozna neko od njih, otvori se izmena sa onim što je razumeo; šta nije uneto ima crven naziv, a obavezna polja i crven okvir. Termin se čuva tek kad dopuniš obavezno.' },
     { t:'Isto vreme', c:'Ako u isto vreme (isti dan i sat) već postoji termin, aplikacija pita da li ipak dodaješ. Takvi termini na spisku imaju oznaku "isto vreme", a u obrascu piše ko je već zakazan.' },
-    { t:'Dodaj', c:'Dugme "Dodaj" gore otvara prazan obrazac za ručni unos: datum, vreme, ime i prezime (obavezno), auto, prečnik (ukucaš 16 → R16), iznos, napomena i telefon. Pored telefona: 📞 otvara Telefon (Nedavni → drži prst na broju → Kopiraj → nazad), 📋 upisuje kopirani broj. Strelica (Enter) na tastaturi čuva termin, isto kao "Sačuvaj".' },
+    { t:'Dodaj', c:'Dugme "Dodaj" gore otvara prazan obrazac za ručni unos: datum, vreme, ime i prezime (obavezno), auto, prečnik (ukucaš 16 → R16), iznos, napomena i telefon. Pored telefona: 📞 otvara Telefon (Nedavni → drži prst na broju → Kopiraj → nazad), 📋 upisuje kopirani broj. Strelica na tastaturi prelazi na sledeće polje; posle telefona stane na "Sačuvaj" (uokvireno), a dodir na njega čuva termin.' },
     { t:'Spisak i prošli termini', c:'Na početnom ekranu su predstojeći termini po danima (Danas, Sutra, pa datumi), unutar dana po vremenu; uz svaki dan piše broj termina i ukupan iznos. Današnji termini ostaju ovde ceo dan. Dugme sa satom gore prikazuje prošle termine (najnoviji gore); ponovni dodir ili korak nazad vraća predstojeće.' },
     { t:'Pretraga i prikaz', c:'"Pretraži" traži po imenu, autu, prečniku, napomeni, telefonu i iznosu, u predstojećim i prošlim terminima. Ikonica ▦/☰ menja prikaz između liste i mreže. Na kartici je ime, a ispod sitno auto, prečnik, napomena i telefon (dodir na broj zove); iznos je desno.' },
     { t:'Sortiranje', c:'"Sortiraj": "Datum i vreme" ređa termine po danu, pa po vremenu. "Ručno (ručke)" prikaže ručku (⠿) desno na svakoj kartici: drži je i prevuci karticu na novo mesto, u okviru istog dana. Ručni redosled se pamti.' },
