@@ -601,11 +601,16 @@ input::selection, textarea::selection{ background:color-mix(in srgb, var(--frame
 .field.miss > label{ color:var(--coral); }
 .field.miss > label .miss-tx{ font-weight:600; }
 .field.miss.req input{ border-color:var(--coral); box-shadow:inset 0 0 0 1px var(--coral); }
-/* dimenzije u tri polja + dodatak (kao Stanje guma); sledeće polje se samo uključi */
-.dim-inputs{ display:flex; align-items:center; gap:5px; }
-.dim-inputs input{ flex:1 1 0; width:0; min-width:44px; text-align:center; }
-.dim-inputs .dim-sep{ color:var(--text-dim); font-size:16px; font-weight:600; flex:none; }
-.dim-inputs input.dim-extra{ flex:0 0 60px; width:60px; padding-left:6px; padding-right:6px; }
+/* prečnik: fiksno „R“ ispred broja; telefon: polje + dugmad 📞 (otvori Telefon) i 📋 (nalepi kopirano) */
+.r-wrap{ display:flex; align-items:center; gap:8px; }
+.r-wrap .r-pre{ font-size:17px; font-weight:700; color:var(--text-dim); }
+.r-wrap input{ flex:0 0 96px; width:96px; text-align:center; }
+.tel-row{ display:flex; gap:8px; align-items:stretch; }
+.tel-row input{ flex:1; min-width:0; }
+.tel-row .tel-btn{ flex:none; width:46px; border-radius:11px; border:1px solid var(--line); background:var(--bg-elevated); color:var(--text); font-size:19px; display:flex; align-items:center; justify-content:center; text-decoration:none; cursor:pointer; padding:0; }
+/* predlog redosleda u polju za unos (kao kartica): sitnije, da stane u jedan red */
+#manualInput::placeholder{ font-size:13px; letter-spacing:-.1px; }
+.zg-meta a.tel-link{ color:inherit; text-decoration:underline; text-underline-offset:2px; }
 .rok-pick{ display:flex; gap:10px; }
 .rok-pick select:first-child{ flex:1.5; min-width:0; }
 .rok-pick select:last-child{ flex:1; min-width:0; }
@@ -682,7 +687,7 @@ html .topbar .backup-reminder-row{ margin-bottom:6px; }
    Kopija Kućne apoteke v55: isti interfejs i ponašanje (zaglavlje, kvadrati, kartice, detalj, obrazac, podešavanja, korpa,
    obaveštenja, korak nazad). Unos kao u Troškovima v40: donja traka (polje se raširi dok se piše, široko Pošalji),
    AI rasporedi i odmah sačuva, ispravka dodirom na stavku. Prefiks podataka: zg: */
-let items = [];   /* {id, datum:'GGGG-MM-DD', vreme:'HH:MM', ime, auto, dimenzije, iznos:broj|null, napomena, napravljeno} */
+let items = [];   /* {id, datum:'GGGG-MM-DD', vreme:'HH:MM', ime, auto, dimenzije (od v6 samo prečnik „R16“), iznos:broj|null, napomena, telefon, napravljeno} */
 let settings = { viewMode: 'lista', sortMode: 'vreme', theme: 'klasicna' };   /* sortMode: 'vreme' = datum i vreme, 'rucno' = ručke */
 let searchOpen = false;
 let pastOnly = false;     /* dugme „Prošla“ u zaglavlju (kao zvonce u Apoteci): prikaz prošlih termina */
@@ -767,13 +772,16 @@ function normDatum(v){
   if(m){ const y = m[3] || String(new Date().getFullYear()); return y+'-'+pad2(+m[2])+'-'+pad2(+m[1]); }
   return '';
 }
-/* dimenzije: „205 55 16“ / „205/55r16“ → „205/55 R16“; ostalo velikim slovima, kako je rečeno */
+/* prečnik (v6): „16“, „r16“, „R 16“, „205/55 R16“ → „R16“ (i „R17.5“); ostalo kako je rečeno */
 function normDim(v){
-  const s = String(v||'').trim().toUpperCase();
-  const m = /^(\d{3})\s*[\/ ]\s*(\d{2})\s*[ -]?\s*Z?R?\s*(\d{2}(?:[.,]5)?)C?$/.exec(s);
-  if(m) return m[1]+'/'+m[2]+' R'+m[3].replace(',','.');
-  return s.replace(/\s+/g,' ');
+  const s = String(v||'').trim().toUpperCase().replace(',','.');
+  if(!s) return '';
+  let m = /^R?\s*(\d{2}(?:\.5)?)C?$/.exec(s) || /R\s*(\d{2}(?:\.5)?)/.exec(s) || /^\d{3}\s*[\/ ]\s*\d{2}\s*[ -]?\s*Z?R?\s*(\d{2}(?:\.5)?)/.exec(s);
+  return m ? 'R'+m[1] : s.replace(/\s+/g,' ');
 }
+/* telefon: samo cifre, + napred i razmaci kako su upisani */
+function normTel(v){ return String(v||'').replace(/[^\d+ \/-]/g,'').replace(/\s+/g,' ').trim(); }
+function telHref(v){ return 'tel:'+String(v||'').replace(/[^\d+]/g,''); }
 /* 15 dana unapred sa imenima dana — AI bira datum iz spiska umesto da sam računa kalendar */
 function calendarHint(){
   const t = todayISO(), rows = [];
@@ -1255,7 +1263,8 @@ const HANDLE_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="curren
 /* kartica: ime, a ispod sitno svi ostali podaci (kao red u Troškovima); iznos desno */
 function apptCardHtml(it, grid, handle){
   const clash = apptClash(it);
-  const meta = [it.auto, it.dimenzije, clash ? fmtIznos(it.iznos) : '', it.napomena].filter(Boolean).join(' · ');
+  const meta = [it.auto, it.dimenzije, clash ? fmtIznos(it.iznos) : '', it.napomena].filter(Boolean).map(escapeHtml)
+    .concat(it.telefon ? ['<a class="tel-link" href="'+telHref(it.telefon)+'" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()">'+escapeHtml(it.telefon)+'</a>'] : []).join(' · ');
   const badge = clash ? '<div class="med-badge'+(grid?' gc-badge':'')+' badge-expired">isto vreme</div>'
                       : (fmtIznos(it.iznos) ? '<div class="med-badge'+(grid?' gc-badge':'')+' badge-ok">'+escapeHtml(fmtIznos(it.iznos))+'</div>' : '');
   const ev = ' id="item-'+it.id+'" data-id="'+it.id+'" onclick="handleCardClick(\''+it.id+'\')" onpointerdown="startCardLongPress(\''+it.id+'\')" onpointerup="cancelCardLongPress()" onpointerleave="cancelCardLongPress()" onpointercancel="cancelCardLongPress()"';
@@ -1263,10 +1272,10 @@ function apptCardHtml(it, grid, handle){
   const h = handle ? '<div class="drag-handle" aria-label="Premesti">'+HANDLE_SVG+'</div>' : '';
   if(grid) return '<div class="grid-card'+(handle?' has-handle':'')+'"'+ev+'>'+thumb+
     '<div class="gc-name">'+escapeHtml(it.ime||'Bez imena')+'</div>'+
-    (meta ? '<div class="gc-sub zg-meta">'+escapeHtml(meta)+'</div>' : '')+badge+h+'</div>';
+    (meta ? '<div class="gc-sub zg-meta">'+meta+'</div>' : '')+badge+h+'</div>';
   return '<div class="med-card'+(handle?' has-handle':'')+'"'+ev+'>'+thumb+
     '<div class="med-info"><div class="med-name">'+escapeHtml(it.ime||'Bez imena')+'</div>'+
-    (meta ? '<div class="med-sub zg-meta">'+escapeHtml(meta)+'</div>' : '')+'</div>'+badge+h+'</div>';
+    (meta ? '<div class="med-sub zg-meta">'+meta+'</div>' : '')+'</div>'+badge+h+'</div>';
 }
 function render(){
   const app = document.getElementById('app');
@@ -1274,7 +1283,7 @@ function render(){
   const up = items.filter(it=>!isPast(it)), past = items.filter(isPast);
   let list;
   if(qWords.length){
-    const hit = it=>{ const hay = foldDiacritics([it.ime, it.auto, it.dimenzije, it.napomena, it.iznos, dmyFromISO(it.datum), it.vreme].filter(x=>x!==null && x!==undefined).join(' ')); return qWords.every(w=>hay.includes(w)); };
+    const hit = it=>{ const hay = foldDiacritics([it.ime, it.auto, it.dimenzije, it.napomena, it.telefon, it.iznos, dmyFromISO(it.datum), it.vreme].filter(x=>x!==null && x!==undefined).join(' ')); return qWords.every(w=>hay.includes(w)); };
     list = sortAppts(up.filter(hit), false).concat(sortAppts(past.filter(hit), true));   /* pretraga: predstojeći pa prošli */
   } else list = pastOnly ? sortAppts(past, true) : sortAppts(up, false);
 
@@ -1314,7 +1323,7 @@ function render(){
     '<div class="bottom-bar">'+
     '<div class="entry-row entry-row-input">'+
     '<div class="entry-input-wrap">'+
-    '<textarea id="manualInput" rows="1" enterkeyhint="send" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Ukucaj ili izgovori termin..." onkeydown="if(event.key===\'Enter\'){ event.preventDefault(); submitManualText(); }"></textarea>'+
+    '<textarea id="manualInput" rows="1" enterkeyhint="send" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Dan, vreme, ime, auto, prečnik, iznos, napomena, telefon" onkeydown="if(event.key===\'Enter\'){ event.preventDefault(); submitManualText(); }"></textarea>'+
     '</div></div>'+
     '<div class="entry-row entry-row-actions">'+
     '<button class="send-btn" '+(isProcessing?'disabled':'')+' onmousedown="event.preventDefault()" onclick="submitManualText()">'+(isProcessing?'<span class="ai-spinner"></span>':ic('➤','send'))+'</button>'+
@@ -1368,7 +1377,7 @@ function confirmDeleteItem(id, swapFromFn){
 }
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 5; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 6; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -1500,7 +1509,7 @@ async function handleIncomingText(text){
   if(miss.length){
     render();
     openItemForm(null);
-    Object.assign(formDraft, { datum:r.datum, vreme:r.vreme, ime:r.ime, auto:r.auto, dimenzije:r.dimenzije, iznos:r.iznos==null?'':String(r.iznos), napomena:r.napomena });
+    Object.assign(formDraft, { datum:r.datum, vreme:r.vreme, ime:r.ime, auto:r.auto, dimenzije:r.dimenzije, iznos:r.iznos==null?'':String(r.iznos), napomena:r.napomena, telefon:r.telefon });
     formAiWarnings = miss; formAiNote = r.nesigurno || '';
     renderItemForm();
     showBanner('Nedostaje: '+miss.join(', ')+' — dopuni i sačuvaj.');
@@ -1516,7 +1525,7 @@ async function handleIncomingText(text){
 }
 function saveRecognized(r){
   const id = uid('t');
-  items.push({ id, datum:r.datum, vreme:r.vreme, ime:r.ime, auto:r.auto, dimenzije:r.dimenzije, iznos:r.iznos, napomena:r.napomena, napravljeno:new Date().toISOString() });
+  items.push({ id, datum:r.datum, vreme:r.vreme, ime:r.ime, auto:r.auto, dimenzije:r.dimenzije, iznos:r.iznos, napomena:r.napomena, telefon:r.telefon, napravljeno:new Date().toISOString() });
   if(!persistItems()){ items = items.filter(x=>x.id!==id); render(); return; }
   if(pastOnly && !isPast(items[items.length-1]) && pastCloseFn) closeOverlay(pastCloseFn);
   render();
@@ -1720,16 +1729,17 @@ async function callGeminiForBooking(rawText){
     'VREME (HH:MM, 24 sata): „u 10“ = 10:00; „u pola 11“ = 10:30 (srpski: pola jedanaest je 10:30); „u 10 i 15“ = 10:15; „u petnaest do 11“ = 10:45; „u 3 popodne“ = 15:00; „uveče“ dodaje 12 sati kad je broj manji od 12. '+
     'Ako je rečen sat od 1 do 7 bez „ujutru“/„popodne“, uzmi popodne (13:00–19:00) i to navedi u polju nesigurno. Ako vreme nije rečeno, prazan string. '+
     'IME: ime i prezime mušterije, velika početna slova; ako nije rečeno, prazan string. AUTO: marka i/ili model, kako je rečeno (npr. „Golf 7“). '+
-    'DIMENZIJE: format guma kao „205/55 R16“ (izgovoreno „dvesta pet pedeset pet šesnaest“ = 205/55 R16); više dimenzija razdvoji zarezom. '+
+    'DIMENZIJE: samo prečnik felne kao „R16“ (izgovoreno „R16“, „er šesnaest“, „šesnaestice“, „16 col“ = R16; ako je rečena cela dimenzija „205/55 R16“, upiši samo R16); ako nije rečen, prazan string. '+
+    'TELEFON: broj telefona mušterije, samo cifre sa razmacima kako je rečeno („nula šezdeset četiri 123 45 67“ = 064 123 45 67); ako nije rečen, prazan string. '+
     'IZNOS: cena u dinarima kao ceo broj, samo cifre („četiri i po hiljade“ = 4500; „4.500“ = 4500); ako nije rečen, prazan string. '+
-    'NAPOMENA: sve ostalo što je rečeno a ne spada u polja (npr. „doneće svoje gume“, „balansiranje“, broj telefona); inače prazan string. '+
+    'NAPOMENA: sve ostalo što je rečeno a ne spada u polja (npr. „doneće svoje gume“, „balansiranje“); inače prazan string. '+
     'NESIGURNO: kratko, šta si morao da pretpostaviš (npr. „vreme 3 shvaćeno kao 15:00“); inače prazan string. '+
     'VAŽNO: ne izmišljaj ništa što nije rečeno.';
   const schema = { type:'object', properties:{
     datum:{ type:'string', description:'GGGG-MM-DD ili prazno' }, vreme:{ type:'string', description:'HH:MM ili prazno' },
     ime:{ type:'string' }, auto:{ type:'string' }, dimenzije:{ type:'string' }, iznos:{ type:'string', description:'ceo broj u dinarima, samo cifre, ili prazno' },
-    napomena:{ type:'string' }, nesigurno:{ type:'string' } },
-    required:['datum','vreme','ime','auto','dimenzije','iznos','napomena','nesigurno'] };
+    napomena:{ type:'string' }, telefon:{ type:'string' }, nesigurno:{ type:'string' } },
+    required:['datum','vreme','ime','auto','dimenzije','iznos','napomena','telefon','nesigurno'] };
   const r = await geminiStructuredRequest(sys, [{ text: rawText }], schema, 1500, 30000);
   return {
     datum: normDatum(r.datum),
@@ -1739,6 +1749,7 @@ async function callGeminiForBooking(rawText){
     dimenzije: normDim(r.dimenzije),
     iznos: normIznos(r.iznos),
     napomena: String(r.napomena||'').trim(),
+    telefon: normTel(r.telefon),
     nesigurno: String(r.nesigurno||'').trim()
   };
 }
@@ -1749,7 +1760,7 @@ function openItemForm(editId, swapFromFn){
   formEditId = editId;
   const it = editId ? getItem(editId) : null;
   formDraft = it ? Object.assign({}, it, { iznos: it.iznos==null ? '' : String(it.iznos) })
-                 : { datum:'', vreme:'', ime:'', auto:'', dimenzije:'', iznos:'', napomena:'' };
+                 : { datum:'', vreme:'', ime:'', auto:'', dimenzije:'', iznos:'', napomena:'', telefon:'' };
   formAnalyzing = false;
   formAiWarnings = [];
   formAiNote = '';
@@ -1814,32 +1825,24 @@ function wireBackspace(el, prev){
   });
 }
 function wireFormFields(){
-  const ids = ['fIme','fAuto','fDimW','fDimP','fDimR','fDimX','fIznos','fNapomena'];
+  const ids = ['fIme','fAuto','fDimR','fIznos','fNapomena','fTel'];
   const els = ids.map(id=>document.getElementById(id));
   els.forEach((el,i)=> wireBackspace(el, i>0 ? els[i-1] : null));
-  /* dimenzije: kad se polje popuni, sledeće se samo uključi (Stanje guma) */
-  [['fDimW','fDimP',3],['fDimP','fDimR',2],['fDimR','fDimX',2]].forEach(([a,b,n])=>{
-    const el = document.getElementById(a), nx = document.getElementById(b);
-    if(!el || el._advWired) return; el._advWired = true;
-    el.addEventListener('input', ()=>{ if(el.value.length >= n){ el.value = el.value.slice(0,n); updateDim(); nx.focus(); } });
-  });
 }
-/* dimenzije: tekst „205/55 R16“ ↔ tri polja + dodatak */
-function splitDim(v){
-  const s = String(v||'').trim();
-  const m = /^(\d{3})\/(\d{2}) R(\d{2}(?:\.5)?)\s*(.*)$/.exec(s);
-  if(m) return { w:m[1], p:m[2], r:m[3], x:m[4] };
-  return { w:'', p:'', r:'', x:s };
+/* prečnik: u polju samo broj, čuva se „R16“; stari zapis „205/55 R16“ ostaje dok se polje ne dira */
+function rimOf(v){ const m = /R\s*(\d{2}(?:\.5)?)/i.exec(String(v||'')) || /^(\d{2}(?:\.5)?)$/.exec(String(v||'').trim()); return m ? m[1] : ''; }
+function onRimInput(el){ el.value = el.value.replace(/[^\d.,]/g,'').replace(',','.').slice(0,4); updateDraft('dimenzije', el.value ? 'R'+el.value : ''); }
+/* telefon: 📋 upiše kopirani broj (Chrome jednom pita za dozvolu) */
+async function pasteTel(){
+  const el = document.getElementById('fTel'); if(!el) return;
+  let t = '';
+  try{ t = await navigator.clipboard.readText(); }
+  catch(e){ showBanner('Ne mogu da pročitam kopirano. Dozvoli Chrome-u „Međuspremnik“ ili drži prst na polju pa Nalepi.'); return; }
+  const n = normTel(t);
+  if(!/\d{5,}/.test(n.replace(/\D/g,''))){ showBanner('U kopiranom nema broja telefona. U Telefonu → Nedavni drži prst na broju pa Kopiraj.'); return; }
+  el.value = n; updateDraft('telefon', n);
 }
-function joinDim(w,p,r,x){
-  w=w.trim(); p=p.trim(); r=r.trim(); x=x.trim();
-  if(w && p && r) return w+'/'+p+' R'+r+x;
-  return [w,p,r,x].filter(Boolean).join(' ');
-}
-function updateDim(){
-  const g = id=> (document.getElementById(id)||{}).value || '';
-  updateDraft('dimenzije', joinDim(g('fDimW'), g('fDimP'), g('fDimR'), g('fDimX')));
-}
+
 /* iznos: tačka na hiljade dok se kuca (Stanje guma) */
 function fmtThou(v){ const d = String(v||'').replace(/\D/g,''); return d ? d.replace(/^0+(?=\d)/,'').replace(/\B(?=(\d{3})+(?!\d))/g,'.') : ''; }
 function onIznosInput(el){ el.value = fmtThou(el.value); updateDraft('iznos', el.value); }
@@ -1880,7 +1883,6 @@ function renderItemForm(){
   const v = k=> escapeHtml(formDraft[k]==null ? '' : formDraft[k]);
   const analyzingHtml = formAnalyzing ? '<div class="ai-analyzing"><span class="ai-spinner"></span> AI čita podatke...</div>' : '';
   const oldBody = b.querySelector('.ff-body'); const keepScroll = oldBody ? oldBody.scrollTop : 0;
-  const dm = splitDim(formDraft.dimenzije);
   const L = (k, txt, req)=> '<label>'+txt+(req?' *':'')+'<span class="miss-tx"></span></label>';
   const orig = formEditId ? getItem(formEditId) : null;
   b.innerHTML = '<div class="modal form-full">'+
@@ -1895,16 +1897,15 @@ function renderItemForm(){
     '</div>'+
     '<div class="field req" data-k="ime">'+L('ime','Ime i prezime',1)+'<input id="fIme" type="text" '+F+' value="'+v('ime')+'" oninput="updateDraft(\'ime\',this.value)" placeholder="npr. Petar Petrović"></div>'+
     '<div class="field" data-k="auto">'+L('auto','Auto model')+'<input id="fAuto" type="text" '+F+' value="'+v('auto')+'" oninput="updateDraft(\'auto\',this.value)" placeholder="npr. Golf 7"></div>'+
-    '<div class="field" data-k="dimenzije">'+L('dimenzije','Dimenzije guma')+'<div class="dim-inputs">'+
-      '<input id="fDimW" type="text" inputmode="numeric" maxlength="3" '+F+' value="'+escapeHtml(dm.w)+'" oninput="updateDim()" placeholder="205">'+
-      '<span class="dim-sep">/</span>'+
-      '<input id="fDimP" type="text" inputmode="numeric" maxlength="2" '+F+' value="'+escapeHtml(dm.p)+'" oninput="updateDim()" placeholder="55">'+
-      '<span class="dim-sep">R</span>'+
-      '<input id="fDimR" type="text" inputmode="numeric" maxlength="4" '+F+' value="'+escapeHtml(dm.r)+'" oninput="updateDim()" placeholder="16">'+
-      '<input id="fDimX" class="dim-extra" type="text" '+F+' value="'+escapeHtml(dm.x)+'" oninput="updateDim()" placeholder="C">'+
-    '</div></div>'+
+    '<div class="field" data-k="dimenzije">'+L('dimenzije','Prečnik')+'<div class="r-wrap"><span class="r-pre">R</span>'+
+      '<input id="fDimR" type="text" inputmode="decimal" '+F+' value="'+escapeHtml(rimOf(formDraft.dimenzije))+'" oninput="onRimInput(this)" placeholder="16"></div></div>'+
     '<div class="field" data-k="iznos">'+L('iznos','Iznos (din)')+'<input id="fIznos" type="text" inputmode="numeric" '+F+' value="'+escapeHtml(fmtThou(formDraft.iznos))+'" oninput="onIznosInput(this)" placeholder="npr. 4.500"></div>'+
     '<div class="field" data-k="napomena"><label>Napomena</label><textarea id="fNapomena" '+F+' oninput="updateDraft(\'napomena\',this.value)" placeholder="npr. doneće svoje gume">'+v('napomena')+'</textarea></div>'+
+    '<div class="field" data-k="telefon"><label>Telefon</label><div class="tel-row">'+
+      '<input id="fTel" type="tel" inputmode="tel" '+F+' value="'+v('telefon')+'" oninput="updateDraft(\'telefon\',this.value)" placeholder="npr. 064 123 45 67">'+
+      '<a class="tel-btn" href="tel:" aria-label="Otvori Telefon">📞</a>'+
+      '<button type="button" class="tel-btn" onclick="pasteTel()" aria-label="Nalepi broj">📋</button>'+
+    '</div></div>'+
     '<div class="field-hint">* obavezno</div>'+
     '</div>'+
     '<div class="modal-actions ff-foot">'+
@@ -1942,8 +1943,8 @@ function saveItemForm(){
   }
   const d = {
     datum: normDatum(formDraft.datum), vreme: normVreme(formDraft.vreme), ime: String(formDraft.ime||'').trim(),
-    auto: String(formDraft.auto||'').trim(), dimenzije: normDim(formDraft.dimenzije), iznos: normIznos(formDraft.iznos),
-    napomena: String(formDraft.napomena||'').trim()
+    auto: String(formDraft.auto||'').trim(), dimenzije: (formEditId && getItem(formEditId) && formDraft.dimenzije===getItem(formEditId).dimenzije) ? formDraft.dimenzije : normDim(formDraft.dimenzije), iznos: normIznos(formDraft.iznos),
+    napomena: String(formDraft.napomena||'').trim(), telefon: normTel(formDraft.telefon)
   };
   if(!d.datum || !d.vreme){ showBanner('Datum ili vreme nisu ispravni — proveri ih.'); return; }
   const editId = formEditId;
@@ -2277,13 +2278,13 @@ let helpCloseFn = null;
 function openHelpScreen(){
   const b = document.createElement('div'); b.className='modal-backdrop top'; b.id='helpBackdrop';
   const sections = [
-    { t:'Unos termina', c:'Dole u polje ukucaj ili izgovori termin (mikrofon na tastaturi), npr. "sutra u 10 Petar Petrović, Golf 7, 205/55 R16, 4500, doneće svoje gume", pa dugme za slanje ili Enter. Polje se raširi dok pišeš. AI sam rasporedi podatke i termin se odmah sačuva; gore piše šta je sačuvano, a nova kartica kratko zasija. AI razume danas, sutra, prekosutra, "u petak", "u pola 11" (10:30).' },
-    { t:'Ispravka', c:'Dodir na karticu otvara detalje termina, pa "Izmeni". Dug pritisak (drži prst) na kartici otvara brzi meni: Izmeni ili Obriši.' },
-    { t:'Kad nešto nedostaje', c:'Datum, vreme i ime su obavezni. Ako AI ne prepozna neko od njih, otvori se obrazac sa onim što je razumeo i upozorenjem šta nedostaje; termin se čuva tek kad ga dopuniš.' },
+    { t:'Unos termina', c:'Dole u polje ukucaj ili izgovori termin (mikrofon na tastaturi), npr. "sutra u 10 Petar Petrović, Golf 7, R16, 4500, doneće svoje gume, telefon 064 123 45 67" (redosled kao na kartici, piše i u praznom polju), pa dugme za slanje ili Enter. Polje se raširi dok pišeš. AI sam rasporedi podatke i termin se odmah sačuva; gore piše šta je sačuvano, a nova kartica kratko zasija. AI razume danas, sutra, prekosutra, "u petak", "u pola 11" (10:30).' },
+    { t:'Ispravka', c:'Dodir na karticu odmah otvara izmenu (prozor odozdo); gore uz ime je "Obriši" (termin ide u korpu). Polja koja nisu uneta imaju crven naziv. Dug pritisak (drži prst) na kartici otvara brzi meni: Izmeni ili Obriši.' },
+    { t:'Kad nešto nedostaje', c:'Datum, vreme i ime su obavezni. Ako AI ne prepozna neko od njih, otvori se izmena sa onim što je razumeo; šta nije uneto ima crven naziv, a obavezna polja i crven okvir. Termin se čuva tek kad dopuniš obavezno.' },
     { t:'Isto vreme', c:'Ako u isto vreme (isti dan i sat) već postoji termin, aplikacija pita da li ipak dodaješ. Takvi termini na spisku imaju oznaku "isto vreme", a u obrascu piše ko je već zakazan.' },
-    { t:'Dodaj', c:'Dugme "Dodaj" gore otvara prazan obrazac za ručni unos: datum, vreme, ime i prezime (obavezno), auto, dimenzije guma, iznos i napomena. Strelica (Enter) na tastaturi čuva termin, isto kao "Sačuvaj".' },
+    { t:'Dodaj', c:'Dugme "Dodaj" gore otvara prazan obrazac za ručni unos: datum, vreme, ime i prezime (obavezno), auto, prečnik (ukucaš 16 → R16), iznos, napomena i telefon. Pored telefona: 📞 otvara Telefon (Nedavni → drži prst na broju → Kopiraj → nazad), 📋 upisuje kopirani broj. Strelica (Enter) na tastaturi čuva termin, isto kao "Sačuvaj".' },
     { t:'Spisak i prošli termini', c:'Na početnom ekranu su predstojeći termini po danima (Danas, Sutra, pa datumi), unutar dana po vremenu; uz svaki dan piše broj termina i ukupan iznos. Današnji termini ostaju ovde ceo dan. Dugme sa satom gore prikazuje prošle termine (najnoviji gore); ponovni dodir ili korak nazad vraća predstojeće.' },
-    { t:'Pretraga i prikaz', c:'"Pretraži" traži po imenu, autu, dimenziji, napomeni i iznosu, u predstojećim i prošlim terminima. Ikonica ▦/☰ menja prikaz između liste i mreže. Na kartici je ime, a ispod sitno auto, dimenzije i napomena; iznos je desno.' },
+    { t:'Pretraga i prikaz', c:'"Pretraži" traži po imenu, autu, prečniku, napomeni, telefonu i iznosu, u predstojećim i prošlim terminima. Ikonica ▦/☰ menja prikaz između liste i mreže. Na kartici je ime, a ispod sitno auto, prečnik, napomena i telefon (dodir na broj zove); iznos je desno.' },
     { t:'Sortiranje', c:'"Sortiraj": "Datum i vreme" ređa termine po danu, pa po vremenu. "Ručno (ručke)" prikaže ručku (⠿) desno na svakoj kartici: drži je i prevuci karticu na novo mesto, u okviru istog dana. Ručni redosled se pamti.' },
     { t:'Izmena podataka', c:'Dodir na polje označi ceo tekst: kucanjem ga zameniš. Za izmenu dela teksta dodirni još jednom tamo gde želiš kursor, pa briši ili kucaj normalno. Taster za brisanje na označenom ili praznom polju ne briše, nego te vrati na prethodno polje.' },
     { t:'Obaveštenja', c:'Sve poruke aplikacije pojavljuju se gore, u okviru sa velikim slovima: zeleno kad je nešto urađeno, crveno kad nešto nije uspelo. Okvir nestane sam (posle 4 sekunde, greška posle 6).' },
