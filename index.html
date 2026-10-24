@@ -281,7 +281,8 @@
   body.noting #app{ padding-top:var(--note-h); }
   body.noting #app .topbar{ top:var(--note-h); }
   body.noting .chat-overlay, body.noting .settings-screen{ top:var(--note-h); }
-  body.noting .modal.full, body.noting .form-full{ top:var(--note-h); height:calc(100% - var(--note-h)); max-height:calc(100% - var(--note-h)); }
+  body.noting .modal.full{ top:var(--note-h); height:calc(100% - var(--note-h)); max-height:calc(100% - var(--note-h)); }
+  body.noting .form-full{ max-height:calc(100% - var(--note-h) - 8px); }
   /* ---- v49: iskačući prozori gore, ispod zamrznutog zaglavlja (--pop-top meri updatePopTop) ---- */
   .modal-backdrop .modal:not(.full):not(.form-full){ top:var(--pop-top); transform:translateX(-50%); max-height:calc(100% - var(--pop-top) - 16px); padding-bottom:22px; }
   .home-sheet-bg{ align-items:flex-start; padding-top:var(--pop-top); box-sizing:border-box; }
@@ -585,13 +586,26 @@ input:focus, textarea:focus, select:focus{ outline:1.5px solid var(--focus-line)
 :is(.search-wrap, .entry-input-wrap) :is(input,textarea):focus{ outline:none !important; }
 .search-wrap:focus-within, .entry-input-wrap:focus-within{ box-shadow:0 0 0 1.5px var(--focus-line) !important; }
 input::selection, textarea::selection{ background:color-mix(in srgb, var(--frame-acc) 40%, transparent); }
-/* v43: „Izmeni / Dodaj stavku“ preko celog ekrana — naslov i dugmad stalno vidljivi, polja se listaju između */
-.modal.form-full{ position:fixed; top:0; bottom:0; left:0; right:0; margin:0 auto; transform:none; width:100%; max-width:520px; height:100%; max-height:none; border-radius:0; padding:0; display:flex; flex-direction:column; overflow:hidden; box-shadow:none; border-top:none !important; border-bottom:none !important; }
-.form-full .ff-head{ flex:none; display:flex; align-items:center; gap:10px; padding:14px 16px 12px; border-bottom:1px solid var(--line); }
-.form-full .ff-head h2{ flex:1; min-width:0; margin:0; padding:0; }
+/* v5: obrazac kao u Stanju guma — prozor odozdo preko zasenčenog ekrana; naslov (i Obriši) gore, dugmad dole, polja se listaju između.
+   Tastatura smanjuje prozor (interactive-widget=resizes-content), pa prozor uvek stoji iznad nje. */
+#formBackdrop{ align-items:flex-end; }
+.modal.form-full{ position:fixed; top:auto; bottom:0; left:0; right:0; margin:0 auto; transform:none; width:100%; max-width:520px; height:auto; max-height:90%; border-radius:18px 18px 0 0; padding:0; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 -10px 30px rgba(0,0,0,.28); border-bottom:none !important; animation:ffUp .22s ease; }
+@keyframes ffUp{ from{ transform:translateY(100%); } to{ transform:translateY(0); } }
+.form-full .ff-head{ flex:none; display:flex; align-items:center; gap:10px; padding:14px 14px 12px 18px; border-bottom:1px solid var(--line); }
+.form-full .ff-head h2{ flex:1; min-width:0; margin:0; padding:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .form-full .ff-head .modal-close-x{ position:static; flex:none; width:36px; height:36px; }
+.form-full .ff-del{ flex:none; height:36px; padding:0 14px; border-radius:18px; border:1px solid color-mix(in srgb, var(--coral) 55%, transparent); background:color-mix(in srgb, var(--coral) 14%, transparent); color:var(--coral); font-size:14px; font-weight:700; font-family:inherit; cursor:pointer; }
 .form-full .ff-body{ flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:16px 18px 10px; }
 .form-full .ff-foot{ flex:none; margin:0; padding:12px 16px calc(14px + env(safe-area-inset-bottom)); border-top:1px solid var(--line); }
+/* šta nije uneto: naziv polja crven sa „nije uneto“; obavezno polje i crven okvir */
+.field.miss > label{ color:var(--coral); }
+.field.miss > label .miss-tx{ font-weight:600; }
+.field.miss.req input{ border-color:var(--coral); box-shadow:inset 0 0 0 1px var(--coral); }
+/* dimenzije u tri polja + dodatak (kao Stanje guma); sledeće polje se samo uključi */
+.dim-inputs{ display:flex; align-items:center; gap:5px; }
+.dim-inputs input{ flex:1 1 0; width:0; min-width:44px; text-align:center; }
+.dim-inputs .dim-sep{ color:var(--text-dim); font-size:16px; font-weight:600; flex:none; }
+.dim-inputs input.dim-extra{ flex:0 0 60px; width:60px; padding-left:6px; padding-right:6px; }
 .rok-pick{ display:flex; gap:10px; }
 .rok-pick select:first-child{ flex:1.5; min-width:0; }
 .rok-pick select:last-child{ flex:1; min-width:0; }
@@ -605,7 +619,6 @@ input::selection, textarea::selection{ background:color-mix(in srgb, var(--frame
 .chat-input-row{ padding-bottom:calc(11px + env(safe-area-inset-bottom,0px)); }
 .crop-header{ padding-top:calc(16px + env(safe-area-inset-top,0px)); }
 .photo-full-close{ top:calc(18px + env(safe-area-inset-top,0px)); }
-.form-full .ff-head{ padding-top:calc(14px + env(safe-area-inset-top,0px)); }
 /* ================= ZAKAZIVANJE GUMA: dopune Apotekinom izgledu ================= */
 /* donja traka za unos kao u Troškovima (Apoteka ima stilove trake za sve teme) */
 #app{ padding-bottom:calc(190px + env(safe-area-inset-bottom,0px)); }
@@ -674,7 +687,6 @@ let settings = { viewMode: 'lista', sortMode: 'vreme', theme: 'klasicna' };   /*
 let searchOpen = false;
 let pastOnly = false;     /* dugme „Prošla“ u zaglavlju (kao zvonce u Apoteci): prikaz prošlih termina */
 let searchQuery = '';
-let openDetailId = null;
 let isProcessing = false; /* AI obrađuje unos iz donje trake */
 
 function todayISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -1078,6 +1090,8 @@ window.addEventListener('resize', updatePopTop);
 
 /* ---------- OVERLAY STACK (da dugme/gest "nazad" zatvara prozorčić umesto da napusti stranicu) ---------- */
 let overlayStack = [];
+/* zatvaranje prozora ide preko history.back(); bez ovoga Chrome vrati staru poziciju ekrana posle čuvanja (isto kao Stanje guma) */
+try{ history.scrollRestoration = 'manual'; }catch(e){}
 let suppressPopstateCount = 0;
 function pushOverlay(removeFn){
   overlayStack.push(removeFn);
@@ -1089,6 +1103,11 @@ function closeOverlay(removeFn){
   removeFn();
   suppressPopstateCount++;
   try{ history.back(); }catch(e){ suppressPopstateCount--; }
+}
+function closeOverlaysTogether(fns){
+  let n = 0;
+  fns.forEach(fn=>{ if(!fn) return; const i = overlayStack.lastIndexOf(fn); if(i!==-1){ overlayStack.splice(i,1); n++; } fn(); });
+  if(n){ suppressPopstateCount++; try{ history.go(-n); }catch(e){ suppressPopstateCount--; } }
 }
 function swapOverlay(oldRemoveFn, newRemoveFn){
   // zamenjuje jedan otvoren prozorcic drugim na ISTOM nivou, bez diranja istorije uopste -
@@ -1183,7 +1202,7 @@ document.addEventListener('pointerdown', (e)=>{
 }, true);
 function handleCardClick(id){
   if(cardLongPressFired){ cardLongPressFired = false; return; }
-  openDetail(id);
+  openItemForm(id);
 }
 let cardMenuCloseFn = null;
 function openCardQuickMenu(id){
@@ -1334,54 +1353,6 @@ function setSearch(v){
   if(el){ el.focus(); try{ el.setSelectionRange(cursorPos, cursorPos); }catch(e){} }
 }
 
-/* ---------- DETALJ TERMINA ---------- */
-let detailCloseFn = null;
-function openDetail(id, swapFromFn){
-  openDetailId = id;
-  renderDetail();
-  if(!detailCloseFn){
-    detailCloseFn = ()=>{
-      openDetailId = null;
-      const b = document.getElementById('detailBackdrop');
-      if(b) b.remove();
-      if(!document.getElementById('formBackdrop')) document.body.style.overflow='';
-      detailCloseFn = null;
-    };
-    if(swapFromFn){ swapOverlay(swapFromFn, detailCloseFn); }
-    else { pushOverlay(detailCloseFn); }
-  }
-}
-function closeDetail(){
-  if(detailCloseFn){ closeOverlay(detailCloseFn); detailCloseFn = null; }
-}
-function renderDetail(){
-  const it = getItem(openDetailId);
-  if(!it) return;
-  let b = document.getElementById('detailBackdrop');
-  if(!b){ b = document.createElement('div'); b.id='detailBackdrop'; b.className='modal-backdrop top'; document.body.appendChild(b); }
-  const c = it.vreme ? findClash(it.datum, it.vreme, it.id) : null;
-  const field = (label, val, cls)=> '<div class="detail-field"><div class="detail-field-label">'+label+'</div><div class="detail-field-value'+(val?(cls?' '+cls:''):' muted')+'">'+(val ? escapeHtml(val) : 'Nije uneto')+'</div></div>';
-  b.innerHTML = '<div class="modal full">'+
-    '<button class="modal-close-x" onclick="closeDetail()">✕</button>'+
-    '<div class="detail-hero">'+
-    '<div class="detail-thumb"><span class="t-time">'+escapeHtml(it.vreme||'—')+'</span></div>'+
-    '<div><div class="detail-title serif">'+escapeHtml(it.ime||'Bez imena')+'</div>'+
-    '<div class="detail-type">'+escapeHtml(dayLabel(it.datum)+(it.vreme?' u '+it.vreme:''))+'</div></div>'+
-    '</div>'+
-    '<div class="detail-body">'+
-    (c ? '<div class="detail-field"><div class="detail-field-label">ISTO VREME</div><div class="detail-field-value warn">⚠ U to vreme je zakazan i: '+escapeHtml(c.ime||'bez imena')+(c.auto?', '+escapeHtml(c.auto):'')+'</div></div>' : '')+
-    field('AUTO MODEL', it.auto)+
-    field('DIMENZIJE GUMA', it.dimenzije)+
-    field('IZNOS', fmtIznos(it.iznos))+
-    (it.napomena ? field('NAPOMENA', it.napomena) : '')+
-    '<div class="detail-actions">'+
-    '<button class="cancel-btn" onclick="openEditForm(\''+it.id+'\')">Izmeni</button>'+
-    '<button class="delete-btn" onclick="confirmDeleteItem(\''+it.id+'\')">Obriši</button>'+
-    '</div>'+
-    '</div></div>';
-  document.body.style.overflow='hidden';
-}
-
 function confirmDeleteItem(id, swapFromFn){
   const it0 = getItem(id);
   showConfirm('Obrisati termin: '+(it0 ? apptShort(it0) : '')+'?', ()=>{
@@ -1391,14 +1362,13 @@ function confirmDeleteItem(id, swapFromFn){
     if(!trashAdd(it)){ showBanner('Brisanje nije uspelo: na telefonu nema mesta za korpu. Isprazni korpu u Podešavanjima pa probaj ponovo.'); return; }
     items = items.filter(i=>i.id!==id);
     persistItems();
-    closeDetail();
     render();
     showBanner('Termin „'+(it.ime||'')+'“ je u korpi.', 'info');
   }, null, swapFromFn);
 }
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 4; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 5; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -1411,9 +1381,6 @@ let formEditId = null;
 let formAnalyzing = false;
 let formAiWarnings = [];
 let formCloseFn = null;
-function openEditForm(id){
-  openItemForm(id);
-}
 
 let pastCloseFn = null;
 function togglePastOnly(){
@@ -1793,7 +1760,7 @@ function openItemForm(editId, swapFromFn){
       const b = document.getElementById('formBackdrop');
       if(b) b.remove();
       formDraft = null; formEditId = null;
-      if(!document.getElementById('detailBackdrop')) document.body.style.overflow='';
+      document.body.style.overflow='';
       formCloseFn = null;
     };
     if(swapFromFn){ swapOverlay(swapFromFn, formCloseFn); }
@@ -1847,10 +1814,35 @@ function wireBackspace(el, prev){
   });
 }
 function wireFormFields(){
-  const ids = ['fIme','fAuto','fDim','fIznos','fNapomena'];
+  const ids = ['fIme','fAuto','fDimW','fDimP','fDimR','fDimX','fIznos','fNapomena'];
   const els = ids.map(id=>document.getElementById(id));
   els.forEach((el,i)=> wireBackspace(el, i>0 ? els[i-1] : null));
+  /* dimenzije: kad se polje popuni, sledeće se samo uključi (Stanje guma) */
+  [['fDimW','fDimP',3],['fDimP','fDimR',2],['fDimR','fDimX',2]].forEach(([a,b,n])=>{
+    const el = document.getElementById(a), nx = document.getElementById(b);
+    if(!el || el._advWired) return; el._advWired = true;
+    el.addEventListener('input', ()=>{ if(el.value.length >= n){ el.value = el.value.slice(0,n); updateDim(); nx.focus(); } });
+  });
 }
+/* dimenzije: tekst „205/55 R16“ ↔ tri polja + dodatak */
+function splitDim(v){
+  const s = String(v||'').trim();
+  const m = /^(\d{3})\/(\d{2}) R(\d{2}(?:\.5)?)\s*(.*)$/.exec(s);
+  if(m) return { w:m[1], p:m[2], r:m[3], x:m[4] };
+  return { w:'', p:'', r:'', x:s };
+}
+function joinDim(w,p,r,x){
+  w=w.trim(); p=p.trim(); r=r.trim(); x=x.trim();
+  if(w && p && r) return w+'/'+p+' R'+r+x;
+  return [w,p,r,x].filter(Boolean).join(' ');
+}
+function updateDim(){
+  const g = id=> (document.getElementById(id)||{}).value || '';
+  updateDraft('dimenzije', joinDim(g('fDimW'), g('fDimP'), g('fDimR'), g('fDimX')));
+}
+/* iznos: tačka na hiljade dok se kuca (Stanje guma) */
+function fmtThou(v){ const d = String(v||'').replace(/\D/g,''); return d ? d.replace(/^0+(?=\d)/,'').replace(/\B(?=(\d{3})+(?!\d))/g,'.') : ''; }
+function onIznosInput(el){ el.value = fmtThou(el.value); updateDraft('iznos', el.value); }
 
 const REQ_FIELDS = [['datum','fDatum','datum'],['vreme','fVreme','vreme'],['ime','fIme','ime i prezime']];
 function formMissing(){ return REQ_FIELDS.filter(r=> !String(formDraft[r[0]]||'').trim()); }
@@ -1858,8 +1850,6 @@ function formMissing(){ return REQ_FIELDS.filter(r=> !String(formDraft[r[0]]||''
 function formWarningsHtml(){
   if(formAnalyzing) return '';
   let h = '';
-  const miss = formMissing();
-  if(miss.length && (formTried || formAiWarnings.length)) h += '<div class="field-warn" style="margin-bottom:10px;">⚠ Nedostaje: '+miss.map(m=>m[2]).join(', ')+' — dopuni pre čuvanja.</div>';
   const c = findClash(normDatum(formDraft.datum), normVreme(formDraft.vreme), formEditId);
   if(c) h += '<div class="field-warn" style="margin-bottom:10px; color:var(--coral);">⚠ U to vreme je već zakazan: '+escapeHtml((c.ime||'bez imena')+(c.auto?', '+c.auto:''))+'.</div>';
   if(formAiNote) h += '<div class="field-hint" style="margin:-4px 0 12px;">AI je pretpostavio: '+escapeHtml(formAiNote)+'</div>';
@@ -1867,6 +1857,19 @@ function formWarningsHtml(){
 }
 function refreshFormWarnings(){
   const box = document.getElementById('formWarn'); if(box) box.innerHTML = formWarningsHtml();
+  refreshMissMarks();
+}
+/* polja koja nisu uneta: crven naziv + „nije uneto“ (obavezna i crven okvir). Kod praznog novog termina tek posle „Sačuvaj“. */
+const MARK_FIELDS = ['datum','vreme','ime','auto','dimenzije','iznos'];
+function refreshMissMarks(){
+  if(!formDraft) return;
+  const show = !!(formEditId || formAiWarnings.length || formTried);
+  MARK_FIELDS.forEach(k=>{
+    const f = document.querySelector('#formBackdrop .field[data-k="'+k+'"]'); if(!f) return;
+    const miss = show && !String(formDraft[k]==null ? '' : formDraft[k]).trim();
+    f.classList.toggle('miss', miss);
+    const t = f.querySelector('.miss-tx'); if(t) t.textContent = miss ? ' — nije uneto' : '';
+  });
 }
 function renderItemForm(){
   let b = document.getElementById('formBackdrop');
@@ -1877,22 +1880,31 @@ function renderItemForm(){
   const v = k=> escapeHtml(formDraft[k]==null ? '' : formDraft[k]);
   const analyzingHtml = formAnalyzing ? '<div class="ai-analyzing"><span class="ai-spinner"></span> AI čita podatke...</div>' : '';
   const oldBody = b.querySelector('.ff-body'); const keepScroll = oldBody ? oldBody.scrollTop : 0;
+  const dm = splitDim(formDraft.dimenzije);
+  const L = (k, txt, req)=> '<label>'+txt+(req?' *':'')+'<span class="miss-tx"></span></label>';
+  const orig = formEditId ? getItem(formEditId) : null;
   b.innerHTML = '<div class="modal form-full">'+
-    '<div class="ff-head"><h2 class="serif">'+(formEditId?'Izmeni termin':'Novi termin')+'</h2>'+
+    '<div class="ff-head"><h2 class="serif">'+escapeHtml(orig ? (orig.ime||'Bez imena') : 'Novi termin')+'</h2>'+
+    (orig ? '<button class="ff-del" onclick="deleteFromForm()">Obriši</button>' : '')+
     '<button class="modal-close-x" onclick="closeItemForm()" aria-label="Zatvori">✕</button></div>'+
     '<div class="ff-body">'+
     analyzingHtml+'<div id="formWarn">'+formWarningsHtml()+'</div>'+
     '<div class="zg-row2">'+
-    '<div class="field"><label>Datum *</label><input id="fDatum" type="date" value="'+v('datum')+'" oninput="updateDraft(\'datum\',this.value)" onchange="updateDraft(\'datum\',this.value)"></div>'+
-    '<div class="field"><label>U koliko sati *</label><input id="fVreme" type="time" step="300" value="'+v('vreme')+'" oninput="updateDraft(\'vreme\',this.value)" onchange="updateDraft(\'vreme\',this.value)"></div>'+
+    '<div class="field req" data-k="datum">'+L('datum','Datum',1)+'<input id="fDatum" type="date" value="'+v('datum')+'" oninput="updateDraft(\'datum\',this.value)" onchange="updateDraft(\'datum\',this.value)"></div>'+
+    '<div class="field req" data-k="vreme">'+L('vreme','U koliko sati',1)+'<input id="fVreme" type="time" step="300" value="'+v('vreme')+'" oninput="updateDraft(\'vreme\',this.value)" onchange="updateDraft(\'vreme\',this.value)"></div>'+
     '</div>'+
-    '<div class="field"><label>Ime i prezime *</label><input id="fIme" type="text" '+F+' value="'+v('ime')+'" oninput="updateDraft(\'ime\',this.value)" placeholder="npr. Petar Petrović"></div>'+
-    '<div class="field"><label>Auto model</label><input id="fAuto" type="text" '+F+' value="'+v('auto')+'" oninput="updateDraft(\'auto\',this.value)" placeholder="npr. Golf 7"></div>'+
-    '<div class="zg-row2">'+
-    '<div class="field"><label>Dimenzije guma</label><input id="fDim" type="text" '+F+' value="'+v('dimenzije')+'" oninput="updateDraft(\'dimenzije\',this.value)" placeholder="205/55 R16"></div>'+
-    '<div class="field"><label>Iznos (din)</label><input id="fIznos" type="text" inputmode="numeric" '+F+' value="'+v('iznos')+'" oninput="updateDraft(\'iznos\',this.value)" placeholder="npr. 4500"></div>'+
-    '</div>'+
-    '<div class="field"><label>Napomena</label><textarea id="fNapomena" '+F+' oninput="updateDraft(\'napomena\',this.value)" placeholder="npr. doneće svoje gume">'+v('napomena')+'</textarea></div>'+
+    '<div class="field req" data-k="ime">'+L('ime','Ime i prezime',1)+'<input id="fIme" type="text" '+F+' value="'+v('ime')+'" oninput="updateDraft(\'ime\',this.value)" placeholder="npr. Petar Petrović"></div>'+
+    '<div class="field" data-k="auto">'+L('auto','Auto model')+'<input id="fAuto" type="text" '+F+' value="'+v('auto')+'" oninput="updateDraft(\'auto\',this.value)" placeholder="npr. Golf 7"></div>'+
+    '<div class="field" data-k="dimenzije">'+L('dimenzije','Dimenzije guma')+'<div class="dim-inputs">'+
+      '<input id="fDimW" type="text" inputmode="numeric" maxlength="3" '+F+' value="'+escapeHtml(dm.w)+'" oninput="updateDim()" placeholder="205">'+
+      '<span class="dim-sep">/</span>'+
+      '<input id="fDimP" type="text" inputmode="numeric" maxlength="2" '+F+' value="'+escapeHtml(dm.p)+'" oninput="updateDim()" placeholder="55">'+
+      '<span class="dim-sep">R</span>'+
+      '<input id="fDimR" type="text" inputmode="numeric" maxlength="4" '+F+' value="'+escapeHtml(dm.r)+'" oninput="updateDim()" placeholder="16">'+
+      '<input id="fDimX" class="dim-extra" type="text" '+F+' value="'+escapeHtml(dm.x)+'" oninput="updateDim()" placeholder="C">'+
+    '</div></div>'+
+    '<div class="field" data-k="iznos">'+L('iznos','Iznos (din)')+'<input id="fIznos" type="text" inputmode="numeric" '+F+' value="'+escapeHtml(fmtThou(formDraft.iznos))+'" oninput="onIznosInput(this)" placeholder="npr. 4.500"></div>'+
+    '<div class="field" data-k="napomena"><label>Napomena</label><textarea id="fNapomena" '+F+' oninput="updateDraft(\'napomena\',this.value)" placeholder="npr. doneće svoje gume">'+v('napomena')+'</textarea></div>'+
     '<div class="field-hint">* obavezno</div>'+
     '</div>'+
     '<div class="modal-actions ff-foot">'+
@@ -1907,6 +1919,7 @@ function renderItemForm(){
     b.addEventListener('click',(e)=>{ if(e.target===b) closeItemForm(); });
   }
   wireFormFields();
+  refreshMissMarks();
 }
 function formEnterKey(e){
   if(e.key !== 'Enter' || e.isComposing) return;
@@ -1923,6 +1936,7 @@ function saveItemForm(){
   const miss = formMissing();
   if(miss.length){
     refreshFormWarnings();
+    showBanner('Unesi: '+miss.map(m=>m[2]).join(', '));
     const el = document.getElementById(miss[0][1]); if(el) el.focus();
     return;
   }
@@ -1953,9 +1967,32 @@ function doSaveItem(editId, d){
   if(!persistItems()) return;   /* „NIJE SAČUVANO!“ je gore; obrazac ostaje otvoren sa unetim podacima */
   render();
   closeItemForm();
-  if(editId) renderDetail();
-  if(newId) scrollAndHighlightItem(newId);
-  showNote('Sačuvano: '+d.ime+', '+dayLabel(d.datum)+' u '+d.vreme);
+  showNote((editId ? 'Izmene sačuvane: ' : 'Dodato: ')+d.ime+', '+dayLabel(d.datum)+' u '+d.vreme);
+  revealCard(editId || newId);   /* posle obaveštenja: ono spusti ekran za jedan red */
+}
+/* sačuvan termin stoji odmah ispod zaglavlja, bez animacije i isticanja (Stanje guma: „prosto je tu“) */
+function revealCard(id){
+  const card = document.getElementById('item-'+id); if(!card) return;
+  const head = document.querySelector('.topbar');
+  const grp = card.closest('.day-grp'); const t = (grp && grp.firstElementChild !== card) ? grp : card;
+  const y = window.scrollY + t.getBoundingClientRect().top - (head ? head.getBoundingClientRect().bottom : 0) - 12;
+  window.scrollTo(0, Math.max(0, y));
+}
+/* Obriši gore u prozoru izmene: potvrda → korpa; potvrda i prozor se zatvaraju jednim korakom istorije */
+function deleteFromForm(){
+  const id = formEditId, it0 = getItem(id); if(!it0) return;
+  const formFn = formCloseFn;
+  showConfirm('Obrisati termin: '+apptShort(it0)+'?', ()=>{});
+  __confirmYes = ()=>{
+    const it = getItem(id); if(!it) return;
+    if(!trashAdd(it)){ closeConfirm(); showBanner('Brisanje nije uspelo: na telefonu nema mesta za korpu. Isprazni korpu u Podešavanjima pa probaj ponovo.'); return; }
+    items = items.filter(i=>i.id!==id);
+    persistItems();
+    closeOverlaysTogether([confirmCloseFn, formFn]); formCloseFn = null;
+    render();
+    showBanner('Termin „'+(it.ime||'')+'“ je u korpi.', 'info');
+  };
+  __confirmOwn = true;
 }
 
 function scrollAndHighlightItem(id){
@@ -2284,14 +2321,15 @@ function showConfirm(msg, onYes, yesLabel, swapFromFn){
     '<button class="delete-btn" onclick="runConfirmYes()">'+(yesLabel||'Da, obriši')+'</button></div></div>';
   document.body.appendChild(b);
   b.addEventListener('click',(e)=>{ if(e.target===b) closeConfirm(); });
-  confirmCloseFn = ()=>{ const bb=document.getElementById('confirmBackdrop'); if(bb) bb.remove(); __confirmYes=null; confirmCloseFn=null; };
+  confirmCloseFn = ()=>{ const bb=document.getElementById('confirmBackdrop'); if(bb) bb.remove(); __confirmYes=null; __confirmOwn=false; confirmCloseFn=null; };
   if(swapFromFn){ swapOverlay(swapFromFn, confirmCloseFn); }
   else { pushOverlay(confirmCloseFn); }
 }
 function closeConfirm(){
   if(confirmCloseFn){ closeOverlay(confirmCloseFn); confirmCloseFn = null; }
 }
-function runConfirmYes(){ const fn=__confirmYes; closeConfirm(); if(fn) fn(); }
+let __confirmOwn = false;
+function runConfirmYes(){ const fn=__confirmYes; if(__confirmOwn){ __confirmOwn=false; if(fn) fn(); return; } closeConfirm(); if(fn) fn(); }
 
 /* ---------- EXIT CONFIRMATION ---------- */
 let exitTrapArmed = false;
