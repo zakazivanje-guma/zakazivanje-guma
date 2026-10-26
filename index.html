@@ -611,6 +611,8 @@ input::selection, textarea::selection{ background:color-mix(in srgb, var(--frame
 .tp-min{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
 .tp-min .tp-b{ height:54px; font-size:20px; }
 .tp-x{ margin-top:12px; height:44px; border-radius:12px; border:none; background:none; width:100%; font:inherit; font-size:15px; color:var(--text-dim); font-weight:600; cursor:pointer; }
+/* v12: „osenčeno“ polje (izgleda kao označen tekst, ali nije stvarno označeno — vidi wireBackspace) */
+.form-full input.pre-sel, .form-full textarea.pre-sel{ background:color-mix(in srgb, var(--green-deep) 20%, var(--bg)); }
 /* strelica na tastaturi posle poslednjeg polja stane na Sačuvaj: jasno uokvireno, dodir čuva */
 .form-full .ff-foot .save-btn:focus{ outline:3px solid var(--focus-line, var(--green-deep)) !important; outline-offset:3px; }
 .form-full .ff-del{ flex:none; height:36px; padding:0 14px; border-radius:18px; border:1px solid color-mix(in srgb, var(--coral) 55%, transparent); background:color-mix(in srgb, var(--coral) 14%, transparent); color:var(--coral); font-size:14px; font-weight:700; font-family:inherit; cursor:pointer; }
@@ -1402,7 +1404,7 @@ function confirmDeleteItem(id, swapFromFn){
 }
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 11; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 12; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -1851,53 +1853,60 @@ function tpPickM(mm){
   const ime = document.getElementById('fIme'); if(ime) ime.focus();
 }
 
-/* v8: polja izmene — kod PREPISAN iz Stanja guma (Zoran 24.10.: tamo mikrofon Gboard-a radi, a Backspace vraća korak nazad).
-   Razlika od starog modula (Apoteka v47) zbog koje je mikrofon skakao nazad: ovde se hvata SAMO 'deleteContentBackward'
-   (pravi Backspace), ne svako brisanje ('delete…'), a drugi dodir ne skida oznaku.
-   - fokus: ceo tekst označen, polje „netaknuto“ (pristineArmed); vrednost se pamti pri otvaranju izmene (fieldOriginal);
-   - Backspace dok je netaknuto ili prazno: ne briše, ide na prethodno polje; ako Gboard ipak obriše, vrati vrednost i ide nazad;
-   - kucanje ili diktat zamenjuje označeno i skida oznaku. */
+/* v12: polja izmene — rešenje po MERENJU na Zoranovom telefonu (v9 i v11 dnevnik, 26.10.):
+   - kad je tekst stvarno označen, Backspace i mikrofon Gboard-a šalju ISTO (taster 229 + brisanje celog označenog, koje se
+     NE da zaustaviti, iako kaže da može); mikrofon ne menja ni visinu ekrana, a diktat stiže tek kad se progovori (i 8 s kasnije);
+   - kad tekst NIJE stvarno označen, Backspace stiže kao pravi taster „Backspace/8“, a slovo/diktat kao taster 229 ili slovo.
+   Zato tekst više nije stvarno označen: polje je samo OSENČENO (izgleda označeno), kursor je na kraju.
+   - Backspace dok je osenčeno ili prazno → korak nazad, tekst netaknut (fokus odmah prelazi, pa brisanje ne stigne);
+   - prvo slovo ili diktat dok je osenčeno → stari tekst se skloni pre upisa, ostaje novo;
+   - drugi dodir na aktivno polje skida senku → normalno uređivanje dela teksta. */
 const fieldOriginal = new WeakMap();
 const pristineArmed = new WeakSet();
 function snapshotField(el){ fieldOriginal.set(el, el.value); }
-function handleFocusSelect(el){
-  if(el.type === 'date'){ pristineArmed.delete(el); return; }
-  el.select();
-  pristineArmed.add(el);
-}
-function wireBackspace(el, prev, onRestore){
+function armField(el){ pristineArmed.add(el); el.classList.add('pre-sel'); }
+function disarmField(el){ pristineArmed.delete(el); el.classList.remove('pre-sel'); }
+function wireBackspace(el, prev){
   if(!el || el._bsWired) return;
   el._bsWired = true;
+  let wasFocused = false;
   const goPrev = () => { if(prev) prev.focus(); };
-  /* jedina dopuna: vrednost se pamti i na svaki fokus, da vraćanje ne izgubi ono što je u ovoj izmeni već upisano */
-  el.addEventListener('focus', () => { snapshotField(el); handleFocusSelect(el); });
+  const clearForNew = () => { el.value = ''; disarmField(el); el.dispatchEvent(new Event('input', { bubbles:true })); };
+  el.addEventListener('pointerdown', () => { wasFocused = (document.activeElement === el); });
+  el.addEventListener('focus', () => {
+    snapshotField(el);
+    if(el.value === ''){ disarmField(el); return; }
+    armField(el);
+    const end = () => { if(document.activeElement === el){ try{ const n = el.value.length; el.setSelectionRange(n, n); }catch(e){} } };
+    end(); setTimeout(end, 0);
+  });
+  el.addEventListener('click', () => { if(wasFocused) disarmField(el); wasFocused = false; });
+  el.addEventListener('blur', () => disarmField(el));
   el.addEventListener('keydown', (e) => {
-    if(e.key !== 'Backspace') return;
-    if(el.value === '' || pristineArmed.has(el)){ e.preventDefault(); goPrev(); }
-  });
-  /* v10, po merenju na Zoranovom telefonu (v9 dnevnik, 26.10.): Backspace i mikrofon Gboard-a šalju ISTO
-     (taster 229 + beforeinput deleteContentBackward preko celog označenog teksta). Razlika: Backspace se da zaustaviti
-     (posle preventDefault nema brisanja), a mikrofon ne (tekst se ipak obriše, pa krene diktat).
-     Zato se nazad ide tek kad se proveri da tekst NIJE obrisan; ako jeste — to je mikrofon: polje ostaje prazno, fokus ostaje. */
-  el.addEventListener('beforeinput', (e) => {
-    if(e.inputType !== 'deleteContentBackward') return;
-    if(el.value === '' || pristineArmed.has(el)){
-      e.preventDefault();
-      const before = el.value;
-      setTimeout(() => {
-        if(document.activeElement !== el) return;
-        if(el.value === before) goPrev();          /* zaustavljeno = Backspace → korak nazad, tekst netaknut */
-        else pristineArmed.delete(el);             /* obrisano uprkos = mikrofon → ostaje u polju za diktat */
-      }, 40);
+    if(e.key === 'Backspace'){
+      if(el.value === '' || pristineArmed.has(el)){ e.preventDefault(); goPrev(); }
+      return;
     }
+    if(!pristineArmed.has(el)) return;
+    if(e.keyCode === 229 || e.key === 'Unidentified' || (e.key && e.key.length === 1 && !e.ctrlKey && !e.metaKey)) clearForNew();
   });
+  /* rezerva: brisanje bez tastera Backspace dok je osenčeno ili prazno → odmah nazad (fokus pređe pre brisanja) */
+  el.addEventListener('beforeinput', (e) => {
+    if(e.inputType === 'deleteContentBackward' && (el.value === '' || pristineArmed.has(el))){ e.preventDefault(); goPrev(); }
+  });
+  /* rezerva: upis stigao bez tastera dok je osenčeno → ostavi samo novo */
   el.addEventListener('input', (e) => {
     if(!pristineArmed.has(el)) return;
-    if(e.inputType === 'deleteContentBackward') return;   /* odluku donosi provera iz beforeinput */
-    pristineArmed.delete(el);
+    const orig = fieldOriginal.get(el) || '';
+    if(e.inputType && e.inputType.indexOf('insert') === 0 && orig && el.value.indexOf(orig) === 0){
+      const novo = el.value.slice(orig.length).replace(/^\s+/, '');
+      disarmField(el); el.value = novo; el.dispatchEvent(new Event('input', { bubbles:true }));
+      return;
+    }
+    if(e.inputType) disarmField(el);
   });
 }
-/* PRIVREMENO v11 — PROBA TASTATURE 2 (ukloniti posle merenja): uz događaje beleži vreme (ms od dodira na polje),
+/* PRIVREMENO (v11–v12) — PROBA TASTATURE 2 (ukloniti posle merenja): uz događaje beleži vreme (ms od dodira na polje),
    visinu vidljivog dela ekrana (menja se kad se tastatura promeni, npr. panel za glas) i da li se brisanje može zaustaviti.
    Ponašanje polja je kao v10. Upis u dnevnik grešaka kad polje izgubi fokus. */
 const _kb = { buf:[], id:'', t0:0 };
@@ -1920,7 +1929,7 @@ function wireFormFields(){
   const ids = ['fIme','fAuto','fDimR','fIznos','fNapomena','fTel'];
   const els = ids.map(id=>document.getElementById(id));
   /* vraćena vrednost ide i u obrazac (inline oninput je već upisao obrisanu) */
-  els.forEach((el,i)=>{ if(el && !el._bsWired) snapshotField(el); wireBackspace(el, i>0 ? els[i-1] : null, ()=> el.dispatchEvent(new Event('input', { bubbles:true }))); });
+  els.forEach((el,i)=> wireBackspace(el, i>0 ? els[i-1] : null));
 }
 /* prečnik: u polju samo broj, čuva se „R16“; stari zapis „205/55 R16“ ostaje dok se polje ne dira */
 function rimOf(v){ const m = /R\s*(\d{2}(?:\.5)?)/i.exec(String(v||'')) || /^(\d{2}(?:\.5)?)$/.exec(String(v||'').trim()); return m ? m[1] : ''; }
@@ -2385,7 +2394,7 @@ function openHelpScreen(){
     { t:'Spisak i prošli termini', c:'Na početnom ekranu su predstojeći termini po danima (Danas, Sutra, pa datumi), unutar dana po vremenu; uz svaki dan piše broj termina i ukupan iznos. Današnji termini ostaju ovde ceo dan. Dugme sa satom gore prikazuje prošle termine (najnoviji gore); ponovni dodir ili korak nazad vraća predstojeće.' },
     { t:'Pretraga i prikaz', c:'"Pretraži" traži po imenu, autu, prečniku, napomeni, telefonu i iznosu, u predstojećim i prošlim terminima. Ikonica ▦/☰ menja prikaz između liste i mreže. Na kartici je ime, a ispod sitno auto, prečnik, napomena i telefon (dodir na broj zove); iznos je desno.' },
     { t:'Sortiranje', c:'"Sortiraj": "Datum i vreme" ređa termine po danu, pa po vremenu. "Ručno (ručke)" prikaže ručku (⠿) desno na svakoj kartici: drži je i prevuci karticu na novo mesto, u okviru istog dana. Ručni redosled se pamti.' },
-    { t:'Izmena podataka', c:'Dodir na polje označi ceo tekst: kucanjem ga zameniš. Mikrofon na tastaturi obriše označeni tekst i upisuje izgovoreno u isto polje. Taster za brisanje na označenom ili praznom polju ne briše, nego te vrati na prethodno polje.' },
+    { t:'Izmena podataka', c:'Dodir na polje ga osenči: Backspace te vrati na prethodno polje bez brisanja, a prvo slovo ili mikrofon zameni stari tekst novim. Drugi dodir skida senku za uređivanje dela teksta. Taster za brisanje na označenom ili praznom polju ne briše, nego te vrati na prethodno polje.' },
     { t:'Obaveštenja', c:'Sve poruke aplikacije pojavljuju se gore, u okviru sa velikim slovima: zeleno kad je nešto urađeno, crveno kad nešto nije uspelo. Okvir nestane sam (posle 4 sekunde, greška posle 6).' },
     { t:'Brisanje prevlačenjem', c:'U prikazu spiska povuci karticu prstom ulevo: ispod nje se pojavi crveno dugme "Izbriši". Dodir na njega traži potvrdu, pa termin ide u korpu. Dodir bilo gde drugde vraća karticu na mesto.' },
     { t:'Korpa', c:'Obrisan termin ide u korpu (Podešavanja → Korpa) i tamo čeka zadati broj dana (podrazumevano 30), pa se sam trajno briše. U korpi izabereš termine, pa "Vrati" ili "Obriši trajno". Korpa ne ulazi u rezervnu kopiju.' },
