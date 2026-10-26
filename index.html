@@ -1583,7 +1583,7 @@ function confirmDeleteItem(id, swapFromFn){
 }
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 14; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 15; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -2067,6 +2067,7 @@ function tpPickM(mm){
    - Backspace → korak nazad; pri izlasku bez unosa stari tekst se vraća (obrazac ga nije ni gubio);
    - kucanje ili diktat → upisuje se samo novo;
    - drugi dodir → stari tekst se vrati u polje za uređivanje dela. */
+/* MODUL gboard-backspace v2 */
 const fieldOriginal = new WeakMap();
 const pristineArmed = new WeakSet();
 function snapshotField(el){ fieldOriginal.set(el, el.value); }
@@ -2110,26 +2111,7 @@ function wireBackspace(el, prev){
   /* prvi upis (slovo ili diktat) u osenčeno polje: senka se skida, ostaje samo novo — kod tekst ne dira */
   el.addEventListener('input', () => { if(pristineArmed.has(el) && el.value !== '') disarmField(el, false); });
 }
-/* PRIVREMENO (v11–v13) — PROBA TASTATURE 2 (ukloniti posle merenja): uz događaje beleži vreme (ms od dodira na polje),
-   visinu vidljivog dela ekrana (menja se kad se tastatura promeni, npr. panel za glas) i da li se brisanje može zaustaviti.
-   Ponašanje polja je kao v10. Upis u dnevnik grešaka kad polje izgubi fokus. */
-const _kb = { buf:[], id:'', t0:0 };
-function kbFlush(){ if(_kb.buf.length){ logError('Proba 2 '+_kb.id, _kb.buf.join(' | ').slice(0,1200)); _kb.buf = []; } }
-function kbDiag(el){
-  if(!el || el._kbDiag) return; el._kbDiag = true;
-  const vv = ()=> Math.round(window.visualViewport ? visualViewport.height : innerHeight);
-  const st = ()=>{ try{ return el.selectionStart+'-'+el.selectionEnd+'/'+el.value.length; }catch(e){ return '?'; } };
-  const add = (t)=>{ if(_kb.id !== el.id){ kbFlush(); _kb.id = el.id; _kb.t0 = performance.now(); } if(_kb.buf.length < 40) _kb.buf.push(Math.round(performance.now()-_kb.t0)+'ms '+t+' v'+vv()); };
-  el.addEventListener('focus', ()=>{ add('fokus '+st()); }, true);
-  el.addEventListener('keydown', (e)=> add('tast '+e.key+'/'+e.keyCode+' '+st()), true);
-  el.addEventListener('beforeinput', (e)=> add('pre '+e.inputType+(e.cancelable?' [može]':' [NE može]')+(e.data!=null?' «'+String(e.data).slice(0,10)+'»':'')+' '+st()), true);
-  el.addEventListener('input', (e)=> add('posle '+(e.inputType||'-')+' '+st()), true);
-  el.addEventListener('compositionstart', ()=> add('komp '+st()), true);
-  el.addEventListener('blur', ()=>{ add('kraj'); kbFlush(); }, true);
-}
-if(window.visualViewport && !window._kbVV){ window._kbVV = true; visualViewport.addEventListener('resize', ()=>{ const a = document.activeElement; if(a && a._kbDiag && _kb.id === a.id && _kb.buf.length < 40) _kb.buf.push(Math.round(performance.now()-_kb.t0)+'ms EKRAN v'+Math.round(visualViewport.height)); }); }
 function wireFormFields(){
-  ['fIme','fAuto','fDimR','fIznos','fNapomena','fTel'].forEach(id=> kbDiag(document.getElementById(id)));
   const ids = ['fIme','fAuto','fDimR','fIznos','fNapomena','fTel'];
   const els = ids.map(id=>document.getElementById(id));
   /* vraćena vrednost ide i u obrazac (inline oninput je već upisao obrisanu) */
