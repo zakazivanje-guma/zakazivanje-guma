@@ -705,6 +705,29 @@ html .home-sq{ gap:3px; }
 html .topbar .backup-reminder-row{ margin-bottom:6px; }
 
 /* v14 (Zoran 26.10.): dug pritisak ne označava tekst ni otvara Chrome-ov meni; polja za unos ostaju normalna */
+/* v14: Završeno — prevlačenje udesno, crven „Prošlo“, označavanje */
+.sw-done{ position:absolute; width:96px; box-sizing:border-box; border:none; z-index:0; background:#2E7D32; color:#fff; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:4px; padding:0 12px 0 0; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.sw-done svg{ width:24px; height:24px; }
+.group-header.grp-late{ background:#F2D3CC !important; color:#8A2E22 !important; }
+.sec-label{ font-size:12px; font-weight:800; letter-spacing:.4px; text-transform:uppercase; color:var(--text); padding:10px 2px 0; }
+.home-sq.sq-on .sq-box{ background:var(--green-deep); border-color:var(--green-deep); color:var(--on-accent); }
+.sel-bar{ display:flex; align-items:center; gap:12px; min-height:54px; margin:0 0 12px; }
+.sel-bar button{ background:none; border:none; font-family:inherit; cursor:pointer; color:var(--text); }
+.sel-x{ font-size:20px; padding:4px 6px; }
+.sel-n{ flex:1; font-size:16px; font-weight:700; color:var(--text); }
+.sel-all{ font-size:15px; font-weight:700; color:var(--green-deep) !important; padding:8px 4px; }
+.med-thumb{ position:relative; }
+.sel-mark{ position:absolute; top:3px; left:3px; width:22px; height:22px; z-index:2; border-radius:50%; border:2px solid var(--line); background:var(--bg-card);
+  display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
+.sel-mark.on{ background:var(--green-deep); border-color:var(--green-deep); color:var(--on-accent); }
+.sel-mark svg{ width:15px; height:15px; }
+.med-card.sel-on, .grid-card.sel-on{ outline:2.5px solid var(--green-deep); outline-offset:-1px; }
+.bottom-bar.sel-actions{ flex-direction:row; gap:10px; }
+.sel-actions button{ height:52px; border-radius:26px; border:none; font-family:inherit; font-size:15px; font-weight:700; color:#fff; cursor:pointer; }
+.sel-back{ flex:1; background:var(--green-deep); color:var(--on-accent) !important; }
+.sel-del{ flex:0 0 120px; background:#9B5040; }
+.sel-actions button.dim{ opacity:.4; }
 body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
 input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default;}
 </style>
@@ -720,7 +743,8 @@ input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:tex
 let items = [];   /* {id, datum:'GGGG-MM-DD', vreme:'HH:MM', ime, auto, dimenzije (od v6 samo prečnik „R16“), iznos:broj|null, napomena, telefon, napravljeno} */
 let settings = { viewMode: 'lista', sortMode: 'vreme', theme: 'klasicna' };   /* sortMode: 'vreme' = datum i vreme, 'rucno' = ručke */
 let searchOpen = false;
-let pastOnly = false;     /* dugme „Prošla“ u zaglavlju (kao zvonce u Apoteci): prikaz prošlih termina */
+let selMode = false, selIds = new Set(), selCloseFn = null;   /* v14: označavanje u Završenom (dug pritisak) */
+let pastOnly = false;     /* v14: ekran „Završeno“ (kvadrat Završeno) */
 let searchQuery = '';
 let isProcessing = false; /* AI obrađuje unos iz donje trake */
 
@@ -776,6 +800,28 @@ function dayLabel(iso){
 }
 /* današnji termini ostaju u predstojećim ceo dan */
 function isPast(it){ return it.datum < todayISO(); }
+/* v14 (Zoran 26.10.): „Završeno“ = samo ono što je prevučeno udesno (polje zavrseno = vreme označavanja, null = zakazano).
+   Termin kome je prošao datum ostaje u zakazanima (crven naslov dana) dok se ne označi. */
+function isDone(it){ return !!it.zavrseno; }
+/* stari podaci (pre v14) i stari bekapi nemaju polje: prošli termini postaju završeni, ostali zakazani — samo jednom po stavci */
+function normDoneFlags(){
+  let ch = false; const t = todayISO(), now = new Date().toISOString();
+  items.forEach(it=>{ if(!('zavrseno' in it)){ it.zavrseno = it.datum < t ? now : null; ch = true; } });
+  if(ch) persistItems();
+}
+/* pretraga i prepoznavanje klijenta: bez obzira na kvačice, veličinu slova, ćirilicu ili latinicu */
+const CYR_LAT = {'а':'a','б':'b','в':'v','г':'g','д':'d','ђ':'đ','е':'e','ж':'ž','з':'z','и':'i','ј':'j','к':'k','л':'l','љ':'lj','м':'m','н':'n','њ':'nj','о':'o','п':'p','р':'r','с':'s','т':'t','ћ':'ć','у':'u','ф':'f','х':'h','ц':'c','ч':'č','џ':'dž','ш':'š'};
+function foldAll(s){ return foldDiacritics(String(s||'').toLowerCase().replace(/[а-яђјљњћџ]/g, ch=>CYR_LAT[ch]||ch)).replace(/\s+/g,' ').trim(); }
+function telKey(v){ const d = String(v||'').replace(/\D/g,''); return d.length >= 6 ? d.slice(-8) : ''; }
+function nameKey(v){ return foldAll(v).split(' ').filter(Boolean).sort().join(' '); }
+/* klijent iz Završenog: isti telefon (poslednjih 8 cifara) ili isto ime i prezime (bilo kojim redom); najnoviji */
+function findDoneMatch(ime, tel, exceptId){
+  const nk = nameKey(ime), tk = telKey(tel);
+  if(!nk && !tk) return null;
+  const m = items.filter(x=>isDone(x) && x.id!==exceptId && ((tk && telKey(x.telefon)===tk) || (nk && nameKey(x.ime)===nk)));
+  m.sort((a,b)=> b.datum.localeCompare(a.datum));
+  return m[0] || null;
+}
 function fmtIznos(n){
   if(n===null || n===undefined || n==='' || isNaN(Number(n))) return '';
   return String(Math.round(Number(n))).replace(/\B(?=(\d{3})+(?!\d))/g, '.')+' din';
@@ -783,7 +829,7 @@ function fmtIznos(n){
 /* termin u isto vreme (isti datum i isto vreme), osim samog sebe */
 function findClash(datum, vreme, excludeId){
   if(!datum || !vreme) return null;
-  return items.find(x=>x.id!==excludeId && x.datum===datum && x.vreme===vreme) || null;
+  return items.find(x=>x.id!==excludeId && !isDone(x) && x.datum===datum && x.vreme===vreme) || null;
 }
 function apptShort(it){ return (it.ime||'bez imena')+', '+dayLabel(it.datum)+(it.vreme?' u '+it.vreme:''); }
 function normIznos(v){ if(v===null || v===undefined) return null; const s = String(v).replace(/[^\d]/g,''); return s==='' ? null : Number(s); }
@@ -828,6 +874,7 @@ const HOME_IC = {
   plus: HI('<path d="M12 5v14M5 12h14"/>',26),
   search: HI('<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',24),
   sort: HI('<path d="M7 4v16M3.5 16.5L7 20l3.5-3.5M17 20V4M13.5 7.5L17 4l3.5 3.5"/>',24),
+  done: HI('<path d="M4.5 12.5l5 5L19.5 7"/>',26),
   cart: HI('<path d="M3 4h2.2l2.2 10.2a1.5 1.5 0 0 0 1.5 1.2h8.3a1.5 1.5 0 0 0 1.5-1.1L20.5 8H6.1"/><circle cx="9.5" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/>',24),
   ai: HI('<path d="M10 3.5l1.6 4.4 4.4 1.6-4.4 1.6L10 15.5l-1.6-4.4L4 9.5l4.4-1.6z"/><path d="M17.5 13.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/>',24),
   camera: HI('<path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',22),
@@ -1131,6 +1178,7 @@ let overlayStack = [];
 /* zatvaranje prozora ide preko history.back(); bez ovoga Chrome vrati staru poziciju ekrana posle čuvanja (isto kao Stanje guma) */
 try{ history.scrollRestoration = 'manual'; }catch(e){}
 let suppressPopstateCount = 0;
+let afterBackQ = [];   /* v14: radnja posle zatvaranja prozora čeka da se korak istorije završi (dva history.back zaredom se gube) */
 function pushOverlay(removeFn){
   overlayStack.push(removeFn);
   try{ history.pushState({ovl:true}, '', location.href); }catch(e){}
@@ -1156,7 +1204,7 @@ function swapOverlay(oldRemoveFn, newRemoveFn){
   overlayStack.push(newRemoveFn);
 }
 window.addEventListener('popstate', function(){
-  if(suppressPopstateCount>0){ suppressPopstateCount--; return; }
+  if(suppressPopstateCount>0){ suppressPopstateCount--; if(!suppressPopstateCount && afterBackQ.length){ const q = afterBackQ; afterBackQ = []; q.forEach(f=>f()); } return; }
   if(exitConfirmed){ return; }
   const fn = overlayStack.pop();
   if(fn){ fn(); return; }
@@ -1175,7 +1223,9 @@ function startCardLongPress(id){
   cardLongPressTimer = setTimeout(()=>{
     cardLongPressFired = true;
     if(navigator.vibrate) navigator.vibrate(30);
-    openCardQuickMenu(id);
+    if(selMode){ toggleSel(id); return; }
+    if(pastOnly && !searchQuery.trim()) enterSelect(id);   /* Završeno: dug pritisak = označavanje (kao Arhiva) */
+    else openCardQuickMenu(id);
   }, 500);
 }
 function cancelCardLongPress(){ clearTimeout(cardLongPressTimer); }
@@ -1186,9 +1236,9 @@ function swClose(anim){
   const o = _swOpen; if(!o) return; _swOpen = null;
   o.tile._swBase = 0;
   o.tile.classList.toggle('sw-anim', anim !== false); o.tile.style.transform = '';
-  setTimeout(()=>{ o.del.remove(); o.tile.classList.remove('sw-anim'); }, anim === false ? 0 : 220);
+  setTimeout(()=>{ if(o.del) o.del.remove(); if(o.done) o.done.remove(); o.tile.classList.remove('sw-anim'); }, anim === false ? 0 : 220);
 }
-function swipeToDelete(tile, id){
+function swipeToDelete(tile, id, allowDone){
   let x0 = 0, y0 = 0, on = false, dx = 0, track = false;
   const mkDel = ()=>{
     const d = document.createElement('button');
@@ -1201,6 +1251,18 @@ function swipeToDelete(tile, id){
     tile.parentNode.appendChild(d);
     return d;
   };
+  /* v14: udesno zeleno „Završeno“ (kao Gmail: levo jedno, desno drugo) */
+  const mkDone = ()=>{
+    const d = document.createElement('button');
+    d.type = 'button'; d.className = 'sw-done';
+    d.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"/></svg><span>Završeno</span>';
+    d.style.top = tile.offsetTop + 'px'; d.style.height = tile.offsetHeight + 'px';
+    d.style.left = tile.offsetLeft + 'px';
+    const r = getComputedStyle(tile); d.style.borderRadius = r.borderTopLeftRadius + ' ' + r.borderTopLeftRadius + ' ' + r.borderBottomLeftRadius + ' ' + r.borderBottomLeftRadius;
+    d.onclick = (e)=>{ e.stopPropagation(); swClose(); markDone(id); };
+    tile.parentNode.appendChild(d);
+    return d;
+  };
   tile.addEventListener('pointerdown', (e)=>{ x0 = e.clientX; y0 = e.clientY; dx = 0; on = false; track = true; tile.dataset.suppressClick = ''; });   /* nov dodir: stara zabrana klika ne važi */
   tile.addEventListener('pointermove', (e)=>{
     if(!track) return;
@@ -1209,11 +1271,15 @@ function swipeToDelete(tile, id){
       if(Math.abs(mx) < 10 || Math.abs(mx) < Math.abs(my) * 1.5) return;
       on = true; cancelCardLongPress();
       if(_swOpen && _swOpen.tile !== tile) swClose();
-      if(!_swOpen) _swOpen = {tile, del: mkDel()};
+      if(!_swOpen) _swOpen = {tile, del: null, done: null};
       try{ tile.setPointerCapture(e.pointerId); }catch(err){}
       tile.classList.remove('sw-anim');
     }
-    dx = Math.max(-SW_W * 1.25, Math.min(0, (tile._swBase || 0) + mx));
+    dx = Math.max(-SW_W * 1.25, Math.min(allowDone ? SW_W * 1.25 : 0, (tile._swBase || 0) + mx));
+    if(dx < 0 && !_swOpen.del) _swOpen.del = mkDel();
+    if(dx > 0 && !_swOpen.done) _swOpen.done = mkDone();
+    if(_swOpen.del) _swOpen.del.style.visibility = dx < 0 ? '' : 'hidden';
+    if(_swOpen.done) _swOpen.done.style.visibility = dx > 0 ? '' : 'hidden';
     tile.style.transform = 'translateX(' + dx + 'px)';
   });
   tile.addEventListener('pointerup', ()=>{
@@ -1223,6 +1289,7 @@ function swipeToDelete(tile, id){
     setTimeout(()=>{ tile.dataset.suppressClick = ''; }, 450);   /* ako posle prevlačenja ne dođe dodir */
     tile.classList.add('sw-anim');
     if(dx < -SW_W / 2){ tile.style.transform = 'translateX(' + (-SW_W) + 'px)'; tile._swBase = -SW_W; }
+    else if(dx > SW_W / 2){ tile.style.transform = 'translateX(' + SW_W + 'px)'; tile._swBase = SW_W; }
     else swClose();
   });
   tile.addEventListener('pointercancel', ()=>{ if(on){ on = false; track = false; swClose(); } else track = false; });
@@ -1235,11 +1302,12 @@ function swipeToDelete(tile, id){
 /* dodir bilo gde van otvorene kartice je zatvara (bez druge radnje na kartici) */
 document.addEventListener('pointerdown', (e)=>{
   if(!_swOpen) return;
-  if(e.target.closest('.sw-del') || _swOpen.tile.contains(e.target)) return;
+  if(e.target.closest('.sw-del') || e.target.closest('.sw-done') || _swOpen.tile.contains(e.target)) return;
   swClose();
 }, true);
 function handleCardClick(id){
   if(cardLongPressFired){ cardLongPressFired = false; return; }
+  if(selMode){ toggleSel(id); return; }
   openItemForm(id);
 }
 let cardMenuCloseFn = null;
@@ -1252,6 +1320,7 @@ function openCardQuickMenu(id){
     '<h2 class="serif" style="font-size:16px; padding-right:30px;">'+escapeHtml(apptShort(it))+'</h2>'+
     '<div style="display:flex; flex-direction:column; gap:9px; margin-top:4px;">'+
     '<button class="cancel-btn" style="text-align:left; padding:13px 14px; border-radius:12px; font-weight:700; font-size:14px;" onclick="quickEditFromMenu(\''+it.id+'\')">✏️ Izmeni</button>'+
+    (isDone(it) ? '<button class="save-btn" style="text-align:left; padding:13px 14px; border-radius:12px; font-weight:700; font-size:14px;" onclick="quickReviveFromMenu(\''+it.id+'\')">↶ Vrati u zakazane</button>' : '')+
     '<button class="delete-btn" style="text-align:left; padding:13px 14px; border-radius:12px; font-weight:700; font-size:14px;" onclick="quickDeleteFromMenu(\''+it.id+'\')">🗑 Obriši</button>'+
     '</div></div>';
   document.body.appendChild(b);
@@ -1266,6 +1335,93 @@ function quickEditFromMenu(id){
   const oldFn = cardMenuCloseFn;
   cardMenuCloseFn = null;
   openItemForm(id, oldFn);             /* meni se menja obrascem na istom koraku istorije */
+}
+function quickReviveFromMenu(id){
+  const oldFn = cardMenuCloseFn;
+  cardMenuCloseFn = null;
+  reviveItems([id], oldFn);
+}
+/* ---------- v14: ZAVRŠENO — označavanje, vraćanje, brisanje više termina ---------- */
+function markDone(id){
+  const it = getItem(id); if(!it) return;
+  it.zavrseno = new Date().toISOString();
+  if(!persistItems()){ it.zavrseno = null; render(); return; }
+  render();
+  showNote('„'+(it.ime||'')+'“ je u Završenom.');
+}
+function enterSelect(id){
+  selMode = true; selIds = new Set([id]); render();
+  selCloseFn = ()=>{ selMode = false; selIds = new Set(); selCloseFn = null; render(); };
+  pushOverlay(selCloseFn);
+}
+function exitSelect(){ if(selCloseFn) closeOverlay(selCloseFn); }
+function toggleSel(id){ if(selIds.has(id)) selIds.delete(id); else selIds.add(id); render(); }
+function selAll(){
+  const ids = items.filter(isDone).map(x=>x.id);
+  selIds = (selIds.size && selIds.size===ids.length) ? new Set() : new Set(ids);
+  render();
+}
+function selRestore(){ if(selIds.size) reviveItems([...selIds], selCloseFn); }
+function selDelete(){
+  const ids = [...selIds]; if(!ids.length) return;
+  const selFn = selCloseFn;
+  showConfirm('Obrisati označene termine ('+ids.length+')? Idu u korpu.', ()=>{});
+  __confirmYes = ()=>{
+    let n = 0;
+    for(const id of ids){ const it = getItem(id); if(!it) continue; if(!trashAdd(it)) break; items = items.filter(i=>i.id!==id); n++; }
+    persistItems();
+    closeOverlaysTogether([confirmCloseFn, selFn]);
+    render();
+    if(n < ids.length) showBanner('Na telefonu nema mesta za korpu — obrisano '+n+' od '+ids.length+'. Isprazni korpu u Podešavanjima.');
+    else showBanner('Obrisano: '+n+' — u korpi.', 'info');
+  };
+  __confirmOwn = true;
+}
+/* Vrati u zakazane: jedan termin sa prošlim datumom → obrazac sa njegovim podacima, bira se nov dan i vreme (stari klijent);
+   ostali se samo vrate (prošao datum = crveno u zakazanima) */
+function reviveItems(ids, fromFn){
+  const t = todayISO();
+  const list = ids.map(getItem).filter(Boolean);
+  if(list.length===1 && list[0].datum < t){ openReviveForm(list[0].id, fromFn); return; }
+  list.forEach(it=>{ it.zavrseno = null; });
+  persistItems();
+  if(fromFn) closeOverlay(fromFn); else render();
+  const late = list.filter(it=>it.datum < t).length;
+  render();
+  showNote(list.length===1 ? 'Vraćeno u zakazane: '+apptShort(list[0]) : 'Vraćeno u zakazane: '+list.length+(late ? ' (sa starim datumom: '+late+' — crveno, promeni im datum)' : ''), { ms: late ? 8000 : 5000 });
+}
+let formRevive = false, formReturnAsked = false;
+function openReviveForm(id, fromFn){
+  openItemForm(id, fromFn);
+  formRevive = true;
+  formDraft.datum = ''; formDraft.vreme = '';
+  renderItemForm();
+  showNote('Izaberi nov dan i vreme za '+(formDraft.ime||'klijenta')+' — ostali podaci su već upisani.', { ms: 6000 });
+  const d = document.getElementById('fDatum');
+  if(d){ try{ d.showPicker(); }catch(e){ d.focus(); } }
+}
+/* stari klijent: nov termin, a isti klijent (ime ili telefon) postoji u Završenom → ponuda da se vrati njegov termin */
+let retCloseFn = null, __retRevive = null, __retNew = null, __retCancel = null;
+function showReturnClient(dm, onRevive, onNew, onCancel){
+  __retRevive = onRevive; __retNew = onNew; __retCancel = onCancel || null;
+  const info = [dm.auto, dm.dimenzije, dm.telefon].filter(Boolean).join(' · ');
+  const b = document.createElement('div'); b.className='modal-backdrop'; b.id='retBackdrop';
+  b.innerHTML = '<div class="modal" style="border-radius:22px;">'+
+    '<h2 class="serif">Klijent već postoji</h2>'+
+    '<p style="font-size:14.5px; color:var(--text); line-height:1.5; margin:0 0 20px;"><b>'+escapeHtml(dm.ime||'')+'</b> je u Završenom'+(info?' ('+escapeHtml(info)+')':'')+
+    ', poslednji termin '+escapeHtml(dmyFromISO(dm.datum))+' Vrati njega u novi termin, sa svim podacima?</p>'+
+    '<div class="modal-actions"><button class="cancel-btn" onclick="runRet(\'new\')">Novi klijent</button>'+
+    '<button class="save-btn" onclick="runRet(\'rev\')">Vrati njega</button></div></div>';
+  document.body.appendChild(b);
+  b.addEventListener('click',(e)=>{ if(e.target===b) closeOverlay(retCloseFn); });
+  retCloseFn = ()=>{ const bb=document.getElementById('retBackdrop'); if(bb) bb.remove(); const c=__retCancel; __retRevive=__retNew=__retCancel=null; retCloseFn=null; if(c) c(); };
+  pushOverlay(retCloseFn);
+}
+function runRet(which){
+  const fn = which==='rev' ? __retRevive : __retNew;
+  __retCancel = null;
+  if(retCloseFn){ if(fn) afterBackQ.push(fn); closeOverlay(retCloseFn); setTimeout(()=>{ const i = afterBackQ.indexOf(fn); if(i!==-1){ afterBackQ.splice(i,1); fn(); } }, 400); }
+  else if(fn) fn();
 }
 function quickDeleteFromMenu(id){
   const oldFn = cardMenuCloseFn;
@@ -1282,10 +1438,10 @@ function sortAppts(arr, desc){
     return desc && !manual ? kb.localeCompare(ka) : ka.localeCompare(kb);
   });
 }
-function apptClash(it){ return items.some(x=>x.id!==it.id && x.datum===it.datum && x.vreme && x.vreme===it.vreme); }
+function apptClash(it){ return !isDone(it) && items.some(x=>x.id!==it.id && !isDone(x) && x.datum===it.datum && x.vreme && x.vreme===it.vreme); }
 /* grupni naslov dana: datum · broj termina · ukupan iznos */
-function dayHeadText(iso){
-  const g = items.filter(x=>x.datum===iso);
+function dayHeadText(iso, arr){
+  const g = arr || items.filter(x=>x.datum===iso);
   const sum = g.reduce((s,x)=> s + (Number(x.iznos)||0), 0);
   return dayLabel(iso)+' · '+g.length+' '+terminRec(g.length)+(sum ? ' · '+fmtIznos(sum) : '');
 }
@@ -1294,61 +1450,65 @@ const HANDLE_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="curren
 function apptCardHtml(it, grid, handle){
   const clash = apptClash(it);
   const meta = [it.auto, it.dimenzije, clash ? fmtIznos(it.iznos) : '', it.napomena].filter(Boolean).map(escapeHtml)
-    .concat(it.telefon ? ['<a class="tel-link" href="'+telHref(it.telefon)+'" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()">'+escapeHtml(it.telefon)+'</a>'] : []).join(' · ');
+    .concat(it.telefon ? ['<a class="tel-link" href="'+telHref(it.telefon)+'" onclick="event.stopPropagation()">'+escapeHtml(it.telefon)+'</a>'] : []).join(' · ');
   const badge = clash ? '<div class="med-badge'+(grid?' gc-badge':'')+' badge-expired">isto vreme</div>'
                       : (fmtIznos(it.iznos) ? '<div class="med-badge'+(grid?' gc-badge':'')+' badge-ok">'+escapeHtml(fmtIznos(it.iznos))+'</div>' : '');
-  const ev = ' id="item-'+it.id+'" data-id="'+it.id+'" onclick="handleCardClick(\''+it.id+'\')" onpointerdown="startCardLongPress(\''+it.id+'\')" onpointerup="cancelCardLongPress()" onpointerleave="cancelCardLongPress()" onpointercancel="cancelCardLongPress()" oncontextmenu="event.preventDefault()"';
-  const thumb = '<div class="med-thumb"><span class="t-time">'+escapeHtml(it.vreme||'—')+'</span></div>';
+  const sel = selMode && selIds.has(it.id);
+  const selMark = selMode ? '<span class="sel-mark'+(sel?' on':'')+'">'+(sel?HOME_IC.done:'')+'</span>' : '';
+  const ev = ' id="item-'+it.id+'" data-id="'+it.id+'"'+(isDone(it)?' data-done="1"':'')+' onclick="handleCardClick(\''+it.id+'\')" onpointerdown="if(!event.target.closest(\'.tel-link\')) startCardLongPress(\''+it.id+'\')" onpointerup="cancelCardLongPress()" onpointerleave="cancelCardLongPress()" onpointercancel="cancelCardLongPress()" oncontextmenu="event.preventDefault()"';
+  const thumb = '<div class="med-thumb">'+selMark+'<span class="t-time">'+escapeHtml(it.vreme||'—')+'</span></div>';
   const h = handle ? '<div class="drag-handle" aria-label="Premesti">'+HANDLE_SVG+'</div>' : '';
-  if(grid) return '<div class="grid-card'+(handle?' has-handle':'')+'"'+ev+'>'+thumb+
+  if(grid) return '<div class="grid-card'+(handle?' has-handle':'')+(sel?' sel-on':'')+'"'+ev+'>'+thumb+
     '<div class="gc-name">'+escapeHtml(it.ime||'Bez imena')+'</div>'+
     (meta ? '<div class="gc-sub zg-meta">'+meta+'</div>' : '')+badge+h+'</div>';
-  return '<div class="med-card'+(handle?' has-handle':'')+'"'+ev+'>'+thumb+
+  return '<div class="med-card'+(handle?' has-handle':'')+(sel?' sel-on':'')+'"'+ev+'>'+thumb+
     '<div class="med-info"><div class="med-name">'+escapeHtml(it.ime||'Bez imena')+'</div>'+
     (meta ? '<div class="med-sub zg-meta">'+meta+'</div>' : '')+'</div>'+badge+h+'</div>';
 }
 function render(){
+  normDoneFlags();
   const app = document.getElementById('app');
-  const qWords = searchQuery.trim().split(/\s+/).filter(Boolean).map(foldDiacritics);
-  const up = items.filter(it=>!isPast(it)), past = items.filter(isPast);
-  let list;
-  if(qWords.length){
-    const hit = it=>{ const hay = foldDiacritics([it.ime, it.auto, it.dimenzije, it.napomena, it.telefon, it.iznos, dmyFromISO(it.datum), it.vreme].filter(x=>x!==null && x!==undefined).join(' ')); return qWords.every(w=>hay.includes(w)); };
-    list = sortAppts(up.filter(hit), false).concat(sortAppts(past.filter(hit), true));   /* pretraga: predstojeći pa prošli */
-  } else list = pastOnly ? sortAppts(past, true) : sortAppts(up, false);
-
-  let listHtml;
-  if(list.length===0){
-    listHtml = '<div class="empty">'+(qWords.length ? 'Nema termina koji odgovaraju pretrazi "'+escapeHtml(searchQuery)+'".' : (pastOnly ? 'Nema prošlih termina.' : 'Nema zakazanih termina.<br>Ukucaj ili izgovori termin u polje dole, ili dodirni „Dodaj“ gore.'))+'</div>';
-  } else {
-    /* svaki dan u svom omotaču (naslov + kartice), da ručke premeštaju samo unutar dana */
-    const handles = settings.sortMode==='rucno' && !qWords.length;
+  const qWords = searchQuery.trim().split(/\s+/).filter(Boolean).map(foldAll);
+  const up = items.filter(it=>!isDone(it)), done = items.filter(isDone);
+  const grid = settings.viewMode==='mreza', t0 = todayISO();
+  /* dani u omotaču (naslov + kartice), da ručke premeštaju samo unutar dana; prošao datum u zakazanima = crven naslov */
+  const daysHtml = (arr, handles, late)=>{
     const days = [];
-    list.forEach(it=>{ if(!days.length || days[days.length-1].d!==it.datum) days.push({d:it.datum, l:[]}); days[days.length-1].l.push(it); });
-    const parts = days.map(g=> '<div class="day-grp" data-day="'+g.d+'"><div class="group-header">'+escapeHtml(dayHeadText(g.d))+'</div>'+
-      g.l.map(it=>apptCardHtml(it, settings.viewMode==='mreza', handles)).join('')+'</div>').join('');
-    listHtml = settings.viewMode==='mreza' ? '<div class="grid-list">'+parts+'</div>' : parts;
+    arr.forEach(it=>{ if(!days.length || days[days.length-1].d!==it.datum) days.push({d:it.datum, l:[]}); days[days.length-1].l.push(it); });
+    return days.map(g=>{ const isLate = late && g.d < t0;
+      return '<div class="day-grp" data-day="'+g.d+'"><div class="group-header'+(isLate?' grp-late':'')+'">'+(isLate?'Prošlo · ':'')+escapeHtml(dayHeadText(g.d, g.l))+'</div>'+
+      g.l.map(it=>apptCardHtml(it, grid, handles)).join('')+'</div>'; }).join('');
+  };
+  let listHtml, n;
+  if(qWords.length){
+    /* pretraga uvek u svim terminima: zakazani, pa završeni */
+    const hit = it=>{ const hay = foldAll([it.ime, it.auto, it.dimenzije, it.napomena, it.telefon, String(it.telefon||'').replace(/\D/g,''), it.iznos, dmyFromISO(it.datum), it.vreme].filter(x=>x!==null && x!==undefined).join(' ')); return qWords.every(w=>hay.includes(w)); };
+    const a = sortAppts(up.filter(hit), false), b = sortAppts(done.filter(hit), true);
+    n = a.length + b.length;
+    listHtml = n===0 ? '<div class="empty">Nema termina koji odgovaraju pretrazi "'+escapeHtml(searchQuery)+'".</div>' :
+      (a.length ? '<div class="sec-label">Zakazano ('+a.length+')</div>'+daysHtml(a, false, true) : '')+
+      (b.length ? '<div class="sec-label">Završeno ('+b.length+')</div>'+daysHtml(b, false, false) : '');
+  } else {
+    const list = pastOnly ? sortAppts(done, true) : sortAppts(up, false);
+    n = list.length;
+    listHtml = n===0 ? '<div class="empty">'+(pastOnly ? 'Nema završenih termina.<br>Termin prevučen udesno dolazi ovde.' : 'Nema zakazanih termina.<br>Ukucaj ili izgovori termin u polje dole, ili dodirni „Dodaj“ gore.')+'</div>'
+      : daysHtml(list, settings.sortMode==='rucno' && !pastOnly, !pastOnly);
   }
-  const countTitle = qWords.length ? 'Pronađeno' : (pastOnly ? 'Prošli termini' : 'Predstojeći termini');
-
-  app.innerHTML =
-    '<div class="topbar">'+
-    backupReminderHtml()+
-    '<div class="home-head"><span class="home-mark">'+HOME_IC.mark+'</span>'+
-    '<div class="home-tt"><div class="app-title serif">Zakazivanje guma</div><div class="home-count">'+countTitle+' ('+list.length+')</div></div>'+
-    '<button class="icon-btn" onclick="toggleViewMode()" title="Promeni prikaz">'+(settings.viewMode==='mreza'?ic('☰','list'):ic('▦','grid'))+'</button>'+
-    '<button class="icon-btn bell-btn'+(pastOnly?' bell-on':'')+'" onclick="togglePastOnly()" title="Prošli termini" aria-label="Prošli termini">'+ic('🕘','history')+'</button>'+
-    '<button class="icon-btn" onclick="openSettings()" title="Podešavanja">'+ic('⚙','gear')+'</button>'+
-    '</div>'+
-    (searchOpen
-      ? '<div class="search-wrap home-search"><span class="sicon">'+ic('🔍','search')+'</span><input id="searchInput" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Pretraži ime, auto, dimenziju, napomenu..." value="'+escapeHtml(searchQuery)+'" oninput="setSearch(this.value)" autofocus><button class="search-x" onclick="toggleSearch()" aria-label="Zatvori pretragu">✕</button></div>'
-      : '<div class="home-sq-row">'+
-        '<button class="home-sq sq-main" onclick="openNewForm()"><span class="sq-box">'+HOME_IC.plus+'</span>Dodaj</button>'+
-        '<button class="home-sq" onclick="toggleSearch()"><span class="sq-box">'+HOME_IC.search+'</span>Pretraži</button>'+
-        '<button class="home-sq" onclick="openSortSheet()"><span class="sq-box">'+HOME_IC.sort+'</span>Sortiraj</button>'+
-        '</div>')+
-    '</div>'+
-    '<div class="list-area">'+listHtml+'</div>'+
+  if(grid && n) listHtml = '<div class="grid-list">'+listHtml+'</div>';
+  const countTitle = qWords.length ? 'Pronađeno' : (pastOnly ? 'Završeni termini' : 'Zakazani termini');
+  const allDone = done.length, nSel = selIds.size;
+  const sqRow = selMode
+    ? '<div class="sel-bar"><button class="sel-x" onclick="exitSelect()" aria-label="Prekini označavanje">✕</button><span class="sel-n">Označeno: '+nSel+'</span>'+
+      '<button class="sel-all" onclick="selAll()">'+(nSel && nSel===allDone ? 'Poništi sve' : 'Označi sve')+'</button></div>'
+    : '<div class="home-sq-row">'+
+      (pastOnly ? '' : '<button class="home-sq sq-main" onclick="openNewForm()"><span class="sq-box">'+HOME_IC.plus+'</span>Dodaj</button>')+
+      '<button class="home-sq" onclick="toggleSearch()"><span class="sq-box">'+HOME_IC.search+'</span>Pretraži</button>'+
+      '<button class="home-sq" onclick="openSortSheet()"><span class="sq-box">'+HOME_IC.sort+'</span>Sortiraj</button>'+
+      '<button class="home-sq'+(pastOnly?' sq-on':'')+'" onclick="togglePastOnly()"><span class="sq-box">'+HOME_IC.done+'</span>Završeno</button>'+
+      '</div>';
+  const bottom = selMode
+    ? '<div class="bottom-bar sel-actions"><button class="sel-back'+(nSel?'':' dim')+'" onclick="selRestore()">↶ Vrati u zakazane</button><button class="sel-del'+(nSel?'':' dim')+'" onclick="selDelete()">Obriši</button></div>'
+    : (pastOnly ? '' :
     /* donja traka kao u Troškovima: polje za unos preko cele širine, ispod široko dugme za slanje (bez četa, Zoran 23.10.) */
     '<div class="bottom-bar">'+
     '<div class="entry-row entry-row-input">'+
@@ -1358,9 +1518,24 @@ function render(){
     '</div></div>'+
     '<div class="entry-row entry-row-actions">'+
     '<button class="send-btn" '+(isProcessing?'disabled':'')+' onmousedown="event.preventDefault()" onclick="submitManualText()">'+(isProcessing?'<span class="ai-spinner"></span>':ic('➤','send'))+'</button>'+
-    '</div></div>';
+    '</div></div>');
+
+  app.innerHTML =
+    '<div class="topbar">'+
+    backupReminderHtml()+
+    '<div class="home-head"><span class="home-mark">'+HOME_IC.mark+'</span>'+
+    '<div class="home-tt"><div class="app-title serif">'+(pastOnly?'Završeno':'Zakazivanje guma')+'</div><div class="home-count">'+countTitle+' ('+n+')</div></div>'+
+    '<button class="icon-btn" onclick="toggleViewMode()" title="Promeni prikaz">'+(settings.viewMode==='mreza'?ic('☰','list'):ic('▦','grid'))+'</button>'+
+    '<button class="icon-btn" onclick="openSettings()" title="Podešavanja">'+ic('⚙','gear')+'</button>'+
+    '</div>'+
+    (searchOpen && !selMode
+      ? '<div class="search-wrap home-search"><span class="sicon">'+ic('🔍','search')+'</span><input id="searchInput" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Pretraži ime, auto, telefon, napomenu..." value="'+escapeHtml(searchQuery)+'" oninput="setSearch(this.value)" autofocus><button class="search-x" onclick="toggleSearch()" aria-label="Zatvori pretragu">✕</button></div>'
+      : sqRow)+
+    '</div>'+
+    '<div class="list-area">'+listHtml+'</div>'+bottom;
   _swOpen = null;
-  if(settings.viewMode!=='mreza') app.querySelectorAll('.day-grp > .med-card').forEach(c=>swipeToDelete(c, c.id.slice(5)));
+  /* ulevo = Izbriši (svuda); udesno = Završeno (samo zakazani termin); bez prevlačenja dok se označava */
+  if(settings.viewMode!=='mreza' && !selMode) app.querySelectorAll('.day-grp > .med-card').forEach(c=>swipeToDelete(c, c.id.slice(5), !c.dataset.done));
   app.querySelectorAll('.drag-handle').forEach(h=>attachHandleDrag(h.parentNode, h));
 
   if(searchOpen){
@@ -1546,6 +1721,15 @@ async function handleIncomingText(text){
     showBanner('Nedostaje: '+miss.join(', ')+' — dopuni i sačuvaj.');
     return;
   }
+  const dm = findDoneMatch(r.ime, r.telefon);
+  if(dm){
+    render();
+    showReturnClient(dm, ()=>reviveRecognized(dm.id, r), ()=>saveRecognizedChecked(r), ()=>{ restoreManualInput(text); });
+    return;
+  }
+  saveRecognizedChecked(r);
+}
+function saveRecognizedChecked(r){
   const c = findClash(r.datum, r.vreme, null);
   if(c){
     render();
@@ -1554,11 +1738,27 @@ async function handleIncomingText(text){
   }
   saveRecognized(r);
 }
+/* stari klijent iz glasovnog unosa: njegov termin se vraća sa novim danom i vremenom; rečeno (auto, iznos…) zamenjuje staro */
+function reviveRecognized(id, r){
+  const it = getItem(id); if(!it) return saveRecognizedChecked(r);
+  const go = ()=>{
+    const old = Object.assign({}, it);
+    it.datum = r.datum; it.vreme = r.vreme; it.zavrseno = null;
+    ['auto','dimenzije','napomena','telefon'].forEach(k=>{ if(r[k]) it[k] = r[k]; });
+    if(r.iznos!=null && r.iznos!=='') it.iznos = r.iznos;
+    if(!persistItems()){ Object.assign(it, old); render(); return; }
+    render(); refocusInput(); scrollAndHighlightItem(id);
+    showNote('Vraćen stari klijent: '+it.ime+', '+dayLabel(it.datum)+' u '+it.vreme+(r.nesigurno ? '. Proveri: '+r.nesigurno : ''), { ms: 6000 });
+  };
+  const c = findClash(r.datum, r.vreme, id);
+  if(c) showClashWarning('U '+r.vreme+' ('+dayLabel(r.datum)+') je već zakazan: '+(c.ime||'bez imena')+(c.auto?', '+c.auto:'')+'. Dodati ipak, ili je ovo greška?', go);
+  else go();
+}
 function saveRecognized(r){
   const id = uid('t');
-  items.push({ id, datum:r.datum, vreme:r.vreme, ime:r.ime, auto:r.auto, dimenzije:r.dimenzije, iznos:r.iznos, napomena:r.napomena, telefon:r.telefon, napravljeno:new Date().toISOString() });
+  items.push({ id, datum:r.datum, vreme:r.vreme, ime:r.ime, auto:r.auto, dimenzije:r.dimenzije, iznos:r.iznos, napomena:r.napomena, telefon:r.telefon, napravljeno:new Date().toISOString(), zavrseno:null });
   if(!persistItems()){ items = items.filter(x=>x.id!==id); render(); return; }
-  if(pastOnly && !isPast(items[items.length-1]) && pastCloseFn) closeOverlay(pastCloseFn);
+  if(pastOnly && pastCloseFn) closeOverlay(pastCloseFn);
   render();
   refocusInput();
   scrollAndHighlightItem(id);
@@ -1796,6 +1996,7 @@ function openItemForm(editId, swapFromFn){
   formAiWarnings = [];
   formAiNote = '';
   formTried = false;
+  formRevive = false; formReturnAsked = false;
   renderItemForm();
   if(!formCloseFn){
     formCloseFn = ()=>{
@@ -2001,7 +2202,7 @@ function renderItemForm(){
     '<div class="field req" data-k="datum">'+L('datum','Datum',1)+'<input id="fDatum" type="date" value="'+v('datum')+'" oninput="updateDraft(\'datum\',this.value)" onchange="onDatumChange(this)"></div>'+
     '<div class="field req" data-k="vreme">'+L('vreme','U koliko sati',1)+'<button type="button" id="fVreme" class="tp-field'+(formDraft.vreme?'':' empty')+'" onclick="openTimePicker()">'+(formDraft.vreme ? escapeHtml(formDraft.vreme) : 'izaberi')+'</button></div>'+
     '</div>'+
-    '<div class="field req" data-k="ime">'+L('ime','Ime i prezime',1)+'<input id="fIme" type="text" '+F+' value="'+v('ime')+'" oninput="updateDraft(\'ime\',this.value)" placeholder="npr. Petar Petrović"></div>'+
+    '<div class="field req" data-k="ime">'+L('ime','Ime i prezime',1)+'<input id="fIme" type="text" '+F+' value="'+v('ime')+'" oninput="updateDraft(\'ime\',this.value)" onchange="checkReturnClientInForm(false)" placeholder="npr. Petar Petrović"></div>'+
     '<div class="field" data-k="auto">'+L('auto','Auto model')+'<input id="fAuto" type="text" '+F+' value="'+v('auto')+'" oninput="updateDraft(\'auto\',this.value)" placeholder="npr. Golf 7"></div>'+
     '<div class="field" data-k="dimenzije">'+L('dimenzije','Prečnik')+'<div class="r-wrap"><span class="r-pre">R</span>'+
       '<input id="fDimR" type="text" inputmode="decimal" '+F+' value="'+escapeHtml(rimOf(formDraft.dimenzije))+'" oninput="onRimInput(this,event)" placeholder="16"></div></div>'+
@@ -2059,6 +2260,8 @@ function saveItemForm(){
     napomena: String(formDraft.napomena||'').trim(), telefon: normTel(formDraft.telefon)
   };
   if(!d.datum || !d.vreme){ showBanner('Datum ili vreme nisu ispravni — proveri ih.'); return; }
+  if(checkReturnClientInForm(true)) return;
+  if(formRevive) d.zavrseno = null;
   const editId = formEditId;
   const c = findClash(d.datum, d.vreme, editId);
   if(c){
@@ -2066,6 +2269,25 @@ function saveItemForm(){
     return;
   }
   doSaveItem(editId, d);
+}
+/* nov termin u obrascu: posle imena (i pri čuvanju) proveri Završeno; „Vrati njega“ upiše njegove podatke, bira se samo dan i vreme */
+function checkReturnClientInForm(fromSave){
+  if(formEditId || !formDraft || formReturnAsked) return false;
+  const dm = findDoneMatch(formDraft.ime, formDraft.telefon);
+  if(!dm) return false;
+  formReturnAsked = true;
+  showReturnClient(dm, ()=>{
+    if(!formDraft) return;
+    const keep = { datum: formDraft.datum, vreme: formDraft.vreme };
+    const f = formDraft;
+    formEditId = dm.id; formRevive = true;
+    formDraft = Object.assign({}, dm, { iznos: dm.iznos==null ? '' : String(dm.iznos) }, keep);
+    ['auto','napomena','telefon'].forEach(k=>{ if(String(f[k]||'').trim()) formDraft[k] = f[k]; });
+    if(String(f.iznos||'').trim()) formDraft.iznos = f.iznos;
+    renderItemForm();
+    showNote('Upisani su podaci klijenta '+(dm.ime||'')+' — proveri i sačuvaj.', { ms: 6000 });
+  }, ()=>{ if(fromSave) saveItemForm(); });
+  return true;
 }
 function doSaveItem(editId, d){
   let newId = null;
@@ -2075,12 +2297,12 @@ function doSaveItem(editId, d){
     Object.assign(it, d);
   } else {
     newId = uid('t');
-    items.push(Object.assign({ id: newId, napravljeno: new Date().toISOString() }, d));
+    items.push(Object.assign({ id: newId, napravljeno: new Date().toISOString(), zavrseno: null }, d));
   }
   if(!persistItems()) return;   /* „NIJE SAČUVANO!“ je gore; obrazac ostaje otvoren sa unetim podacima */
   render();
   closeItemForm();
-  showNote((editId ? 'Izmene sačuvane: ' : 'Dodato: ')+d.ime+', '+dayLabel(d.datum)+' u '+d.vreme);
+  showNote((d.zavrseno===null && editId ? 'Vraćeno u zakazane: ' : editId ? 'Izmene sačuvane: ' : 'Dodato: ')+d.ime+', '+dayLabel(d.datum)+' u '+d.vreme);
   revealCard(editId || newId);   /* posle obaveštenja: ono spusti ekran za jedan red */
 }
 /* sačuvan termin stoji odmah ispod zaglavlja, bez animacije i isticanja (Stanje guma: „prosto je tu“) */
@@ -2395,8 +2617,9 @@ function openHelpScreen(){
     { t:'Kad nešto nedostaje', c:'Datum, vreme i ime su obavezni. Ako AI ne prepozna neko od njih, otvori se izmena sa onim što je razumeo; šta nije uneto ima crven naziv, a obavezna polja i crven okvir. Termin se čuva tek kad dopuniš obavezno.' },
     { t:'Isto vreme', c:'Ako u isto vreme (isti dan i sat) već postoji termin, aplikacija pita da li ipak dodaješ. Takvi termini na spisku imaju oznaku "isto vreme", a u obrascu piše ko je već zakazan.' },
     { t:'Dodaj', c:'Dodir na Dodaj odmah otvara kalendar; posle datuma izađe panel "U koliko sati?" (sat, pa minuti :00/:15/:30/:45), a dodir na minut otvara tastaturu za ime. Dugme "Dodaj" gore otvara prazan obrazac za ručni unos: datum, vreme, ime i prezime (obavezno), auto, prečnik (ukucaš 16 → R16), iznos, napomena i telefon. Pored telefona: 📞 otvara Telefon (Nedavni → drži prst na broju → Kopiraj → nazad), 📋 upisuje kopirani broj. Strelica na tastaturi prelazi na sledeće polje; posle telefona stane na "Sačuvaj" (uokvireno), a dodir na njega čuva termin.' },
-    { t:'Spisak i prošli termini', c:'Na početnom ekranu su predstojeći termini po danima (Danas, Sutra, pa datumi), unutar dana po vremenu; uz svaki dan piše broj termina i ukupan iznos. Današnji termini ostaju ovde ceo dan. Dugme sa satom gore prikazuje prošle termine (najnoviji gore); ponovni dodir ili korak nazad vraća predstojeće.' },
-    { t:'Pretraga i prikaz', c:'"Pretraži" traži po imenu, autu, prečniku, napomeni, telefonu i iznosu, u predstojećim i prošlim terminima. Ikonica ▦/☰ menja prikaz između liste i mreže. Na kartici je ime, a ispod sitno auto, prečnik, napomena i telefon (dodir na broj zove); iznos je desno.' },
+    { t:'Zakazano i Završeno', c:'Na početnom ekranu su zakazani termini po danima, unutar dana po vremenu; uz svaki dan piše broj termina i ukupan iznos. Povuci karticu udesno: pojavi se zeleno "Završeno", dodir na njega prebacuje termin u Završeno. Termin kome je prošao dan, a nije završen, ostaje gore sa crvenim naslovom "Prošlo". Kvadrat "Završeno" otvara završene termine (najnoviji gore); ponovni dodir ili korak nazad vraća zakazane.' },
+    { t:'Vraćanje iz Završenog', c:'U Završenom drži prst na kartici: uključi se označavanje (dodirom dodaješ ili skidaš kartice, "Označi sve" gore). Dole "Vrati u zakazane" ili "Obriši" (ide u korpu); ✕ ili korak nazad prekida. Jedan termin sa starim datumom otvara se sa svim podacima, a ti izabereš nov dan i vreme. Kad unosiš nov termin, a isti klijent (ime ili telefon) postoji u Završenom, aplikacija pita: "Vrati njega" upiše sve njegove podatke, "Novi klijent" pravi nov termin.' },
+    { t:'Pretraga i prikaz', c:'"Pretraži" traži po imenu, autu, prečniku, napomeni, telefonu i iznosu, uvek i u zakazanim i u završenim (prvo zakazani), bez obzira na kvačice, velika slova i ćirilicu ili latinicu. Ikonica ▦/☰ menja prikaz između liste i mreže. Na kartici je ime, a ispod sitno auto, prečnik, napomena i telefon (dodir na broj zove); iznos je desno.' },
     { t:'Sortiranje', c:'"Sortiraj": "Datum i vreme" ređa termine po danu, pa po vremenu. "Ručno (ručke)" prikaže ručku (⠿) desno na svakoj kartici: drži je i prevuci karticu na novo mesto, u okviru istog dana. Ručni redosled se pamti.' },
     { t:'Izmena podataka', c:'Dodir na polje ga osenči: Backspace te vrati na prethodno polje bez brisanja, a prvo slovo ili mikrofon zameni stari tekst novim. Drugi dodir vraća tekst u polje za uređivanje dela teksta. Ako izađeš bez unosa, stari tekst ostaje. Taster za brisanje na označenom ili praznom polju ne briše, nego te vrati na prethodno polje.' },
     { t:'Obaveštenja', c:'Sve poruke aplikacije pojavljuju se gore, u okviru sa velikim slovima: zeleno kad je nešto urađeno, crveno kad nešto nije uspelo. Okvir nestane sam (posle 4 sekunde, greška posle 6).' },
