@@ -611,8 +611,9 @@ input::selection, textarea::selection{ background:color-mix(in srgb, var(--frame
 .tp-min{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
 .tp-min .tp-b{ height:54px; font-size:20px; }
 .tp-x{ margin-top:12px; height:44px; border-radius:12px; border:none; background:none; width:100%; font:inherit; font-size:15px; color:var(--text-dim); font-weight:600; cursor:pointer; }
-/* v12: „osenčeno“ polje (izgleda kao označen tekst, ali nije stvarno označeno — vidi wireBackspace) */
+/* v13: osenčeno polje — prazno, a stari tekst se vidi kao osenčen predlog (vidi wireBackspace) */
 .form-full input.pre-sel, .form-full textarea.pre-sel{ background:color-mix(in srgb, var(--green-deep) 20%, var(--bg)); }
+.form-full input.pre-sel::placeholder, .form-full textarea.pre-sel::placeholder{ color:var(--text); opacity:1; }
 /* strelica na tastaturi posle poslednjeg polja stane na Sačuvaj: jasno uokvireno, dodir čuva */
 .form-full .ff-foot .save-btn:focus{ outline:3px solid var(--focus-line, var(--green-deep)) !important; outline-offset:3px; }
 .form-full .ff-del{ flex:none; height:36px; padding:0 14px; border-radius:18px; border:1px solid color-mix(in srgb, var(--coral) 55%, transparent); background:color-mix(in srgb, var(--coral) 14%, transparent); color:var(--coral); font-size:14px; font-weight:700; font-family:inherit; cursor:pointer; }
@@ -1404,7 +1405,7 @@ function confirmDeleteItem(id, swapFromFn){
 }
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 12; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 13; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -1853,60 +1854,59 @@ function tpPickM(mm){
   const ime = document.getElementById('fIme'); if(ime) ime.focus();
 }
 
-/* v12: polja izmene — rešenje po MERENJU na Zoranovom telefonu (v9 i v11 dnevnik, 26.10.):
-   - kad je tekst stvarno označen, Backspace i mikrofon Gboard-a šalju ISTO (taster 229 + brisanje celog označenog, koje se
-     NE da zaustaviti, iako kaže da može); mikrofon ne menja ni visinu ekrana, a diktat stiže tek kad se progovori (i 8 s kasnije);
-   - kad tekst NIJE stvarno označen, Backspace stiže kao pravi taster „Backspace/8“, a slovo/diktat kao taster 229 ili slovo.
-   Zato tekst više nije stvarno označen: polje je samo OSENČENO (izgleda označeno), kursor je na kraju.
-   - Backspace dok je osenčeno ili prazno → korak nazad, tekst netaknut (fokus odmah prelazi, pa brisanje ne stigne);
-   - prvo slovo ili diktat dok je osenčeno → stari tekst se skloni pre upisa, ostaje novo;
-   - drugi dodir na aktivno polje skida senku → normalno uređivanje dela teksta. */
+/* v13: polja izmene — po merenju na Zoranovom telefonu (v9, v11, v12 dnevnik, 26.10.):
+   - na STVARNO označenom tekstu Backspace i mikrofon Gboard-a šalju isto (brisanje koje se ne da zaustaviti);
+   - u PRAZNOM polju Backspace stiže kao taster „Backspace/8“, a mikrofon i kucanje rade bez smetnje;
+   - v12 je brisao stari tekst iz koda u trenutku dodira na mikrofon → Gboard prekine glas posle 2 slova (zato je tek drugi
+     dodir radio). Pravilo: dok tastatura radi, kod NE menja tekst u polju.
+   Zato: pri ulasku u polje (dodir, strelica, Backspace) polje je PRAZNO, a stari tekst se vidi osenčen (kao predlog u polju).
+   - Backspace → korak nazad; pri izlasku bez unosa stari tekst se vraća (obrazac ga nije ni gubio);
+   - kucanje ili diktat → upisuje se samo novo;
+   - drugi dodir → stari tekst se vrati u polje za uređivanje dela. */
 const fieldOriginal = new WeakMap();
 const pristineArmed = new WeakSet();
 function snapshotField(el){ fieldOriginal.set(el, el.value); }
-function armField(el){ pristineArmed.add(el); el.classList.add('pre-sel'); }
-function disarmField(el){ pristineArmed.delete(el); el.classList.remove('pre-sel'); }
+function armField(el){
+  const orig = el.value;
+  fieldOriginal.set(el, orig);
+  if(el.dataset.ph == null) el.dataset.ph = el.getAttribute('placeholder') || '';
+  el.setAttribute('placeholder', orig);
+  el.value = '';
+  pristineArmed.add(el); el.classList.add('pre-sel');
+}
+function disarmField(el, restore){
+  if(!pristineArmed.has(el)) return;
+  pristineArmed.delete(el); el.classList.remove('pre-sel');
+  if(el.dataset.ph != null) el.setAttribute('placeholder', el.dataset.ph);
+  if(restore && el.value === '') el.value = fieldOriginal.get(el) || '';
+}
 function wireBackspace(el, prev){
   if(!el || el._bsWired) return;
   el._bsWired = true;
   let wasFocused = false;
   const goPrev = () => { if(prev) prev.focus(); };
-  const clearForNew = () => { el.value = ''; disarmField(el); el.dispatchEvent(new Event('input', { bubbles:true })); };
   el.addEventListener('pointerdown', () => { wasFocused = (document.activeElement === el); });
-  el.addEventListener('focus', () => {
-    snapshotField(el);
-    if(el.value === ''){ disarmField(el); return; }
-    armField(el);
-    const end = () => { if(document.activeElement === el){ try{ const n = el.value.length; el.setSelectionRange(n, n); }catch(e){} } };
-    end(); setTimeout(end, 0);
+  el.addEventListener('focus', () => { if(el.value !== '') armField(el); });
+  /* drugi dodir: stari tekst nazad u polje, kursor na kraj */
+  el.addEventListener('click', () => {
+    if(wasFocused && pristineArmed.has(el)){
+      disarmField(el, true);
+      try{ const n = el.value.length; el.setSelectionRange(n, n); }catch(e){}
+    }
+    wasFocused = false;
   });
-  el.addEventListener('click', () => { if(wasFocused) disarmField(el); wasFocused = false; });
-  el.addEventListener('blur', () => disarmField(el));
+  /* izlaz bez unosa: stari tekst se vraća (obrazac je i dalje ima) */
+  el.addEventListener('blur', () => disarmField(el, true));
   el.addEventListener('keydown', (e) => {
-    if(e.key === 'Backspace'){
-      if(el.value === '' || pristineArmed.has(el)){ e.preventDefault(); goPrev(); }
-      return;
-    }
-    if(!pristineArmed.has(el)) return;
-    if(e.keyCode === 229 || e.key === 'Unidentified' || (e.key && e.key.length === 1 && !e.ctrlKey && !e.metaKey)) clearForNew();
+    if(e.key === 'Backspace' && el.value === ''){ e.preventDefault(); goPrev(); }
   });
-  /* rezerva: brisanje bez tastera Backspace dok je osenčeno ili prazno → odmah nazad (fokus pređe pre brisanja) */
   el.addEventListener('beforeinput', (e) => {
-    if(e.inputType === 'deleteContentBackward' && (el.value === '' || pristineArmed.has(el))){ e.preventDefault(); goPrev(); }
+    if(e.inputType === 'deleteContentBackward' && el.value === ''){ e.preventDefault(); goPrev(); }
   });
-  /* rezerva: upis stigao bez tastera dok je osenčeno → ostavi samo novo */
-  el.addEventListener('input', (e) => {
-    if(!pristineArmed.has(el)) return;
-    const orig = fieldOriginal.get(el) || '';
-    if(e.inputType && e.inputType.indexOf('insert') === 0 && orig && el.value.indexOf(orig) === 0){
-      const novo = el.value.slice(orig.length).replace(/^\s+/, '');
-      disarmField(el); el.value = novo; el.dispatchEvent(new Event('input', { bubbles:true }));
-      return;
-    }
-    if(e.inputType) disarmField(el);
-  });
+  /* prvi upis (slovo ili diktat) u osenčeno polje: senka se skida, ostaje samo novo — kod tekst ne dira */
+  el.addEventListener('input', () => { if(pristineArmed.has(el) && el.value !== '') disarmField(el, false); });
 }
-/* PRIVREMENO (v11–v12) — PROBA TASTATURE 2 (ukloniti posle merenja): uz događaje beleži vreme (ms od dodira na polje),
+/* PRIVREMENO (v11–v13) — PROBA TASTATURE 2 (ukloniti posle merenja): uz događaje beleži vreme (ms od dodira na polje),
    visinu vidljivog dela ekrana (menja se kad se tastatura promeni, npr. panel za glas) i da li se brisanje može zaustaviti.
    Ponašanje polja je kao v10. Upis u dnevnik grešaka kad polje izgubi fokus. */
 const _kb = { buf:[], id:'', t0:0 };
@@ -1933,7 +1933,8 @@ function wireFormFields(){
 }
 /* prečnik: u polju samo broj, čuva se „R16“; stari zapis „205/55 R16“ ostaje dok se polje ne dira */
 function rimOf(v){ const m = /R\s*(\d{2}(?:\.5)?)/i.exec(String(v||'')) || /^(\d{2}(?:\.5)?)$/.exec(String(v||'').trim()); return m ? m[1] : ''; }
-function onRimInput(el){ el.value = el.value.replace(/[^\d.,]/g,'').replace(',','.').slice(0,4); updateDraft('dimenzije', el.value ? 'R'+el.value : ''); }
+/* v13: tekst se menja iz koda samo kad mora i nikad usred diktata (to gasi mikrofon) */
+function onRimInput(el, ev){ const c = el.value.replace(/[^\d.,]/g,'').replace(',','.').slice(0,4); if(c !== el.value && !(ev && ev.isComposing)) el.value = c; updateDraft('dimenzije', el.value ? 'R'+el.value.replace(/[^\d.]/g,'') : ''); }
 /* telefon: 📋 upiše kopirani broj (Chrome jednom pita za dozvolu) */
 async function pasteTel(){
   const el = document.getElementById('fTel'); if(!el) return;
@@ -1947,7 +1948,7 @@ async function pasteTel(){
 
 /* iznos: tačka na hiljade dok se kuca (Stanje guma) */
 function fmtThou(v){ const d = String(v||'').replace(/\D/g,''); return d ? d.replace(/^0+(?=\d)/,'').replace(/\B(?=(\d{3})+(?!\d))/g,'.') : ''; }
-function onIznosInput(el){ el.value = fmtThou(el.value); updateDraft('iznos', el.value); }
+function onIznosInput(el, ev){ const f = fmtThou(el.value); if(f !== el.value && !(ev && ev.isComposing)) el.value = f; updateDraft('iznos', el.value); }
 
 const REQ_FIELDS = [['datum','fDatum','datum'],['vreme','fVreme','vreme'],['ime','fIme','ime i prezime']];
 function formMissing(){ return REQ_FIELDS.filter(r=> !String(formDraft[r[0]]||'').trim()); }
@@ -2000,8 +2001,8 @@ function renderItemForm(){
     '<div class="field req" data-k="ime">'+L('ime','Ime i prezime',1)+'<input id="fIme" type="text" '+F+' value="'+v('ime')+'" oninput="updateDraft(\'ime\',this.value)" placeholder="npr. Petar Petrović"></div>'+
     '<div class="field" data-k="auto">'+L('auto','Auto model')+'<input id="fAuto" type="text" '+F+' value="'+v('auto')+'" oninput="updateDraft(\'auto\',this.value)" placeholder="npr. Golf 7"></div>'+
     '<div class="field" data-k="dimenzije">'+L('dimenzije','Prečnik')+'<div class="r-wrap"><span class="r-pre">R</span>'+
-      '<input id="fDimR" type="text" inputmode="decimal" '+F+' value="'+escapeHtml(rimOf(formDraft.dimenzije))+'" oninput="onRimInput(this)" placeholder="16"></div></div>'+
-    '<div class="field" data-k="iznos">'+L('iznos','Iznos (din)')+'<input id="fIznos" type="text" inputmode="numeric" '+F+' value="'+escapeHtml(fmtThou(formDraft.iznos))+'" oninput="onIznosInput(this)" placeholder="npr. 4.500"></div>'+
+      '<input id="fDimR" type="text" inputmode="decimal" '+F+' value="'+escapeHtml(rimOf(formDraft.dimenzije))+'" oninput="onRimInput(this,event)" placeholder="16"></div></div>'+
+    '<div class="field" data-k="iznos">'+L('iznos','Iznos (din)')+'<input id="fIznos" type="text" inputmode="numeric" '+F+' value="'+escapeHtml(fmtThou(formDraft.iznos))+'" oninput="onIznosInput(this,event)" placeholder="npr. 4.500"></div>'+
     '<div class="field" data-k="napomena"><label>Napomena</label><textarea id="fNapomena" '+F+' oninput="updateDraft(\'napomena\',this.value)" placeholder="npr. doneće svoje gume">'+v('napomena')+'</textarea></div>'+
     '<div class="field" data-k="telefon"><label>Telefon</label><div class="tel-row">'+
       '<input id="fTel" type="tel" inputmode="tel" '+F+' value="'+v('telefon')+'" oninput="updateDraft(\'telefon\',this.value)" placeholder="npr. 064 123 45 67">'+
@@ -2394,7 +2395,7 @@ function openHelpScreen(){
     { t:'Spisak i prošli termini', c:'Na početnom ekranu su predstojeći termini po danima (Danas, Sutra, pa datumi), unutar dana po vremenu; uz svaki dan piše broj termina i ukupan iznos. Današnji termini ostaju ovde ceo dan. Dugme sa satom gore prikazuje prošle termine (najnoviji gore); ponovni dodir ili korak nazad vraća predstojeće.' },
     { t:'Pretraga i prikaz', c:'"Pretraži" traži po imenu, autu, prečniku, napomeni, telefonu i iznosu, u predstojećim i prošlim terminima. Ikonica ▦/☰ menja prikaz između liste i mreže. Na kartici je ime, a ispod sitno auto, prečnik, napomena i telefon (dodir na broj zove); iznos je desno.' },
     { t:'Sortiranje', c:'"Sortiraj": "Datum i vreme" ređa termine po danu, pa po vremenu. "Ručno (ručke)" prikaže ručku (⠿) desno na svakoj kartici: drži je i prevuci karticu na novo mesto, u okviru istog dana. Ručni redosled se pamti.' },
-    { t:'Izmena podataka', c:'Dodir na polje ga osenči: Backspace te vrati na prethodno polje bez brisanja, a prvo slovo ili mikrofon zameni stari tekst novim. Drugi dodir skida senku za uređivanje dela teksta. Taster za brisanje na označenom ili praznom polju ne briše, nego te vrati na prethodno polje.' },
+    { t:'Izmena podataka', c:'Dodir na polje ga osenči: Backspace te vrati na prethodno polje bez brisanja, a prvo slovo ili mikrofon zameni stari tekst novim. Drugi dodir vraća tekst u polje za uređivanje dela teksta. Ako izađeš bez unosa, stari tekst ostaje. Taster za brisanje na označenom ili praznom polju ne briše, nego te vrati na prethodno polje.' },
     { t:'Obaveštenja', c:'Sve poruke aplikacije pojavljuju se gore, u okviru sa velikim slovima: zeleno kad je nešto urađeno, crveno kad nešto nije uspelo. Okvir nestane sam (posle 4 sekunde, greška posle 6).' },
     { t:'Brisanje prevlačenjem', c:'U prikazu spiska povuci karticu prstom ulevo: ispod nje se pojavi crveno dugme "Izbriši". Dodir na njega traži potvrdu, pa termin ide u korpu. Dodir bilo gde drugde vraća karticu na mesto.' },
     { t:'Korpa', c:'Obrisan termin ide u korpu (Podešavanja → Korpa) i tamo čeka zadati broj dana (podrazumevano 30), pa se sam trajno briše. U korpi izabereš termine, pa "Vrati" ili "Obriši trajno". Korpa ne ulazi u rezervnu kopiju.' },
