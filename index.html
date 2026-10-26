@@ -1402,7 +1402,7 @@ function confirmDeleteItem(id, swapFromFn){
 }
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 9; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 10; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -1875,40 +1875,29 @@ function wireBackspace(el, prev, onRestore){
     if(e.key !== 'Backspace') return;
     if(el.value === '' || pristineArmed.has(el)){ e.preventDefault(); goPrev(); }
   });
+  /* v10, po merenju na Zoranovom telefonu (v9 dnevnik, 26.10.): Backspace i mikrofon Gboard-a šalju ISTO
+     (taster 229 + beforeinput deleteContentBackward preko celog označenog teksta). Razlika: Backspace se da zaustaviti
+     (posle preventDefault nema brisanja), a mikrofon ne (tekst se ipak obriše, pa krene diktat).
+     Zato se nazad ide tek kad se proveri da tekst NIJE obrisan; ako jeste — to je mikrofon: polje ostaje prazno, fokus ostaje. */
   el.addEventListener('beforeinput', (e) => {
     if(e.inputType !== 'deleteContentBackward') return;
-    if(el.value === '' || pristineArmed.has(el)){ e.preventDefault(); goPrev(); }
+    if(el.value === '' || pristineArmed.has(el)){
+      e.preventDefault();
+      const before = el.value;
+      setTimeout(() => {
+        if(document.activeElement !== el) return;
+        if(el.value === before) goPrev();          /* zaustavljeno = Backspace → korak nazad, tekst netaknut */
+        else pristineArmed.delete(el);             /* obrisano uprkos = mikrofon → ostaje u polju za diktat */
+      }, 40);
+    }
   });
   el.addEventListener('input', (e) => {
     if(!pristineArmed.has(el)) return;
-    if(e.inputType === 'deleteContentBackward'){
-      const original = fieldOriginal.get(el) ?? '';
-      el.value = original;
-      if(onRestore) onRestore();
-      goPrev();
-      return;
-    }
+    if(e.inputType === 'deleteContentBackward') return;   /* odluku donosi provera iz beforeinput */
     pristineArmed.delete(el);
   });
 }
-/* PRIVREMENO v9 — PROBA TASTATURE (ukloniti posle merenja): beleži šta Gboard šalje u polja izmene (Backspace vs mikrofon),
-   ponašanje polja se NE menja. Upis u dnevnik grešaka (Podešavanja → crveni broj ispod verzije) kad polje izgubi fokus. */
-const _kb = { buf:[], id:'' };
-function kbFlush(){ if(_kb.buf.length){ logError('Proba tastature '+_kb.id, _kb.buf.join(' | ').slice(0,900)); _kb.buf = []; } }
-function kbDiag(el){
-  if(!el || el._kbDiag) return; el._kbDiag = true;
-  const sel = ()=>{ try{ return el.selectionStart+'-'+el.selectionEnd+'/'+el.value.length; }catch(e){ return '?'; } };
-  const add = (t)=>{ if(_kb.id !== el.id){ kbFlush(); _kb.id = el.id; } if(_kb.buf.length < 40) _kb.buf.push(t); };
-  el.addEventListener('focus', ()=> add('fokus '+sel()), true);
-  el.addEventListener('keydown', (e)=> add('tast '+e.key+'/'+e.keyCode+' '+sel()), true);
-  el.addEventListener('beforeinput', (e)=> add('pre '+e.inputType+(e.data!=null?' «'+String(e.data).slice(0,12)+'»':'')+' '+sel()), true);
-  el.addEventListener('input', (e)=> add('posle '+(e.inputType||'-')+' '+sel()), true);
-  el.addEventListener('compositionstart', ()=> add('komp-poč '+sel()), true);
-  el.addEventListener('compositionend', (e)=> add('komp-kraj «'+String(e.data||'').slice(0,12)+'»'), true);
-  el.addEventListener('blur', ()=>{ add('kraj'); kbFlush(); }, true);
-}
 function wireFormFields(){
-  ['fIme','fAuto','fDimR','fIznos','fNapomena','fTel'].forEach(id=> kbDiag(document.getElementById(id)));
   const ids = ['fIme','fAuto','fDimR','fIznos','fNapomena','fTel'];
   const els = ids.map(id=>document.getElementById(id));
   /* vraćena vrednost ide i u obrazac (inline oninput je već upisao obrisanu) */
@@ -2377,7 +2366,7 @@ function openHelpScreen(){
     { t:'Spisak i prošli termini', c:'Na početnom ekranu su predstojeći termini po danima (Danas, Sutra, pa datumi), unutar dana po vremenu; uz svaki dan piše broj termina i ukupan iznos. Današnji termini ostaju ovde ceo dan. Dugme sa satom gore prikazuje prošle termine (najnoviji gore); ponovni dodir ili korak nazad vraća predstojeće.' },
     { t:'Pretraga i prikaz', c:'"Pretraži" traži po imenu, autu, prečniku, napomeni, telefonu i iznosu, u predstojećim i prošlim terminima. Ikonica ▦/☰ menja prikaz između liste i mreže. Na kartici je ime, a ispod sitno auto, prečnik, napomena i telefon (dodir na broj zove); iznos je desno.' },
     { t:'Sortiranje', c:'"Sortiraj": "Datum i vreme" ređa termine po danu, pa po vremenu. "Ručno (ručke)" prikaže ručku (⠿) desno na svakoj kartici: drži je i prevuci karticu na novo mesto, u okviru istog dana. Ručni redosled se pamti.' },
-    { t:'Izmena podataka', c:'Dodir na polje označi ceo tekst: kucanjem ga zameniš. Mikrofon na tastaturi zameni označeni tekst izgovorenim. Taster za brisanje na označenom ili praznom polju ne briše, nego te vrati na prethodno polje.' },
+    { t:'Izmena podataka', c:'Dodir na polje označi ceo tekst: kucanjem ga zameniš. Mikrofon na tastaturi obriše označeni tekst i upisuje izgovoreno u isto polje. Taster za brisanje na označenom ili praznom polju ne briše, nego te vrati na prethodno polje.' },
     { t:'Obaveštenja', c:'Sve poruke aplikacije pojavljuju se gore, u okviru sa velikim slovima: zeleno kad je nešto urađeno, crveno kad nešto nije uspelo. Okvir nestane sam (posle 4 sekunde, greška posle 6).' },
     { t:'Brisanje prevlačenjem', c:'U prikazu spiska povuci karticu prstom ulevo: ispod nje se pojavi crveno dugme "Izbriši". Dodir na njega traži potvrdu, pa termin ide u korpu. Dodir bilo gde drugde vraća karticu na mesto.' },
     { t:'Korpa', c:'Obrisan termin ide u korpu (Podešavanja → Korpa) i tamo čeka zadati broj dana (podrazumevano 30), pa se sam trajno briše. U korpi izabereš termine, pa "Vrati" ili "Obriši trajno". Korpa ne ulazi u rezervnu kopiju.' },
