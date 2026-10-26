@@ -592,6 +592,25 @@ input::selection, textarea::selection{ background:color-mix(in srgb, var(--frame
 .form-full .ff-head{ flex:none; display:flex; align-items:center; gap:10px; padding:calc(14px + env(safe-area-inset-top,0px)) 14px 12px 18px; border-bottom:1px solid var(--line); }
 .form-full .ff-head h2{ flex:1; min-width:0; margin:0; padding:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .form-full .ff-head .modal-close-x{ position:static; flex:none; width:36px; height:36px; }
+/* v9: polje vremena je dugme koje otvara panel; panel odozdo preko obrasca (Zoran 24.10. odobrio sliku) */
+.tp-field{ width:100%; box-sizing:border-box; text-align:left; font:inherit; font-size:16px; padding:11px 14px; border-radius:11px; border:1px solid var(--line); background:var(--bg); color:var(--text); cursor:pointer; min-height:46px; }
+.tp-field.empty{ color:var(--text-dim); }
+.field.miss.req .tp-field{ border-color:var(--coral); box-shadow:inset 0 0 0 1px var(--coral); }
+.tp-bg{ position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:400; display:flex; align-items:flex-end; justify-content:center; }
+.tp{ width:100%; max-width:520px; background:var(--bg-elevated); border-radius:18px 18px 0 0; padding:14px 14px calc(18px + env(safe-area-inset-bottom)); box-shadow:0 -10px 30px rgba(0,0,0,.25); animation:tpUp .2s ease; }
+@keyframes tpUp{ from{ transform:translateY(100%); } to{ transform:translateY(0); } }
+.tp-head{ display:flex; align-items:center; justify-content:space-between; margin:0 4px 10px; }
+.tp-head .t{ font-size:17px; font-weight:700; color:var(--text); }
+.tp-head .v{ font-family:var(--font-title); font-size:30px; font-weight:700; color:var(--green-deep); }
+.tp-lab{ font-size:12.5px; font-weight:700; color:var(--text-dim); margin:6px 4px; text-transform:uppercase; letter-spacing:.3px; }
+.tp-grid{ display:grid; grid-template-columns:repeat(6,1fr); gap:7px; }
+.tp-b{ height:46px; border-radius:12px; border:1px solid var(--line); background:var(--bg); font:inherit; font-size:18px; font-weight:700; color:var(--text); cursor:pointer; padding:0; }
+.tp-b.dim{ color:var(--text-dim); font-weight:500; opacity:.75; }
+.tp-b.on{ background:var(--green-deep); color:#fff; border-color:var(--green-deep); opacity:1; }
+.tp-b:disabled{ opacity:.4; }
+.tp-min{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+.tp-min .tp-b{ height:54px; font-size:20px; }
+.tp-x{ margin-top:12px; height:44px; border-radius:12px; border:none; background:none; width:100%; font:inherit; font-size:15px; color:var(--text-dim); font-weight:600; cursor:pointer; }
 /* strelica na tastaturi posle poslednjeg polja stane na Sačuvaj: jasno uokvireno, dodir čuva */
 .form-full .ff-foot .save-btn:focus{ outline:3px solid var(--focus-line, var(--green-deep)) !important; outline-offset:3px; }
 .form-full .ff-del{ flex:none; height:36px; padding:0 14px; border-radius:18px; border:1px solid color-mix(in srgb, var(--coral) 55%, transparent); background:color-mix(in srgb, var(--coral) 14%, transparent); color:var(--coral); font-size:14px; font-weight:700; font-family:inherit; cursor:pointer; }
@@ -1318,7 +1337,7 @@ function render(){
     (searchOpen
       ? '<div class="search-wrap home-search"><span class="sicon">'+ic('🔍','search')+'</span><input id="searchInput" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Pretraži ime, auto, dimenziju, napomenu..." value="'+escapeHtml(searchQuery)+'" oninput="setSearch(this.value)" autofocus><button class="search-x" onclick="toggleSearch()" aria-label="Zatvori pretragu">✕</button></div>'
       : '<div class="home-sq-row">'+
-        '<button class="home-sq sq-main" onclick="openItemForm(null)"><span class="sq-box">'+HOME_IC.plus+'</span>Dodaj</button>'+
+        '<button class="home-sq sq-main" onclick="openNewForm()"><span class="sq-box">'+HOME_IC.plus+'</span>Dodaj</button>'+
         '<button class="home-sq" onclick="toggleSearch()"><span class="sq-box">'+HOME_IC.search+'</span>Pretraži</button>'+
         '<button class="home-sq" onclick="openSortSheet()"><span class="sq-box">'+HOME_IC.sort+'</span>Sortiraj</button>'+
         '</div>')+
@@ -1785,6 +1804,52 @@ function openItemForm(editId, swapFromFn){
   }
 }
 function updateDraft(field, value){ formDraft[field] = value; refreshFormWarnings(); }
+/* v9: novi termin redom — kalendar → panel za vreme → tastatura za ime (Zoran 24.10.) */
+function openNewForm(){
+  openItemForm(null);
+  const d = document.getElementById('fDatum');
+  if(!d) return;
+  try{ d.showPicker(); }catch(e){ d.focus(); }
+}
+function onDatumChange(el){
+  updateDraft('datum', el.value);
+  if(el.value && formDraft && !formDraft.vreme) openTimePicker();
+}
+
+/* ---------- PANEL ZA VREME (v9, umesto brojčanika): sat 0–23, pa minut → upiše, zatvori, fokus na Ime ---------- */
+let tpCloseFn = null, tpH = null, tpM = null;
+function openTimePicker(){
+  if(!formDraft || document.getElementById('tpBackdrop')) return;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(formDraft.vreme || '');
+  tpH = m ? +m[1] : null; tpM = m ? m[2] : null;
+  const b = document.createElement('div');
+  b.id = 'tpBackdrop'; b.className = 'tp-bg';
+  b.addEventListener('click', e=>{ if(e.target === b) closeOverlay(tpCloseFn); });
+  document.body.appendChild(b);
+  renderTimePicker();
+  tpCloseFn = ()=>{ const x = document.getElementById('tpBackdrop'); if(x) x.remove(); tpCloseFn = null; };
+  pushOverlay(tpCloseFn);
+}
+function renderTimePicker(){
+  const b = document.getElementById('tpBackdrop'); if(!b) return;
+  const pad = n=> String(n).padStart(2,'0');
+  const H = [...Array(24).keys()].map(h=>'<button type="button" class="tp-b'+(h===tpH?' on':'')+(h<7||h>20?' dim':'')+'" onclick="tpPickH('+h+')">'+h+'</button>').join('');
+  const M = ['00','15','30','45'].map(mm=>'<button type="button" class="tp-b'+(mm===tpM && tpH!=null?' on':'')+'" onclick="tpPickM(\''+mm+'\')"'+(tpH==null?' disabled':'')+'>:'+mm+'</button>').join('');
+  b.innerHTML = '<div class="tp"><div class="tp-head"><span class="t">U koliko sati?</span><span class="v">'+(tpH==null?'--':pad(tpH))+':'+(tpM||'--')+'</span></div>'+
+    '<div class="tp-lab">1. Sat</div><div class="tp-grid">'+H+'</div>'+
+    '<div class="tp-lab" style="margin-top:12px">2. Minuti — dodir upiše vreme i otvori Ime</div><div class="tp-min">'+M+'</div>'+
+    '<button type="button" class="tp-x" onclick="closeOverlay(tpCloseFn)">Otkaži</button></div>';
+}
+function tpPickH(h){ tpH = h; renderTimePicker(); }
+function tpPickM(mm){
+  if(tpH == null) return;
+  const val = String(tpH).padStart(2,'0')+':'+mm;
+  closeOverlay(tpCloseFn);
+  if(!formDraft) return;
+  updateDraft('vreme', val);
+  const f = document.getElementById('fVreme'); if(f){ f.textContent = val; f.classList.remove('empty'); }
+  const ime = document.getElementById('fIme'); if(ime) ime.focus();
+}
 
 /* v8: polja izmene — kod PREPISAN iz Stanja guma (Zoran 24.10.: tamo mikrofon Gboard-a radi, a Backspace vraća korak nazad).
    Razlika od starog modula (Apoteka v47) zbog koje je mikrofon skakao nazad: ovde se hvata SAMO 'deleteContentBackward'
@@ -1912,8 +1977,8 @@ function renderItemForm(){
     '<div class="ff-body">'+
     analyzingHtml+'<div id="formWarn">'+formWarningsHtml()+'</div>'+
     '<div class="zg-row2">'+
-    '<div class="field req" data-k="datum">'+L('datum','Datum',1)+'<input id="fDatum" type="date" value="'+v('datum')+'" oninput="updateDraft(\'datum\',this.value)" onchange="updateDraft(\'datum\',this.value)"></div>'+
-    '<div class="field req" data-k="vreme">'+L('vreme','U koliko sati',1)+'<input id="fVreme" type="time" step="300" value="'+v('vreme')+'" oninput="updateDraft(\'vreme\',this.value)" onchange="updateDraft(\'vreme\',this.value)"></div>'+
+    '<div class="field req" data-k="datum">'+L('datum','Datum',1)+'<input id="fDatum" type="date" value="'+v('datum')+'" oninput="updateDraft(\'datum\',this.value)" onchange="onDatumChange(this)"></div>'+
+    '<div class="field req" data-k="vreme">'+L('vreme','U koliko sati',1)+'<button type="button" id="fVreme" class="tp-field'+(formDraft.vreme?'':' empty')+'" onclick="openTimePicker()">'+(formDraft.vreme ? escapeHtml(formDraft.vreme) : 'izaberi')+'</button></div>'+
     '</div>'+
     '<div class="field req" data-k="ime">'+L('ime','Ime i prezime',1)+'<input id="fIme" type="text" '+F+' value="'+v('ime')+'" oninput="updateDraft(\'ime\',this.value)" placeholder="npr. Petar Petrović"></div>'+
     '<div class="field" data-k="auto">'+L('auto','Auto model')+'<input id="fAuto" type="text" '+F+' value="'+v('auto')+'" oninput="updateDraft(\'auto\',this.value)" placeholder="npr. Golf 7"></div>'+
@@ -1963,6 +2028,7 @@ function saveItemForm(){
   if(miss.length){
     refreshFormWarnings();
     showBanner('Unesi: '+miss.map(m=>m[2]).join(', '));
+    if(miss[0][1] === 'fVreme'){ openTimePicker(); return; }
     const el = document.getElementById(miss[0][1]); if(el) el.focus();
     return;
   }
@@ -2307,7 +2373,7 @@ function openHelpScreen(){
     { t:'Ispravka', c:'Dodir na karticu odmah otvara izmenu (prozor odozdo); gore uz ime je "Obriši" (termin ide u korpu). Polja koja nisu uneta imaju crven naziv. Dug pritisak (drži prst) na kartici otvara brzi meni: Izmeni ili Obriši.' },
     { t:'Kad nešto nedostaje', c:'Datum, vreme i ime su obavezni. Ako AI ne prepozna neko od njih, otvori se izmena sa onim što je razumeo; šta nije uneto ima crven naziv, a obavezna polja i crven okvir. Termin se čuva tek kad dopuniš obavezno.' },
     { t:'Isto vreme', c:'Ako u isto vreme (isti dan i sat) već postoji termin, aplikacija pita da li ipak dodaješ. Takvi termini na spisku imaju oznaku "isto vreme", a u obrascu piše ko je već zakazan.' },
-    { t:'Dodaj', c:'Dugme "Dodaj" gore otvara prazan obrazac za ručni unos: datum, vreme, ime i prezime (obavezno), auto, prečnik (ukucaš 16 → R16), iznos, napomena i telefon. Pored telefona: 📞 otvara Telefon (Nedavni → drži prst na broju → Kopiraj → nazad), 📋 upisuje kopirani broj. Strelica na tastaturi prelazi na sledeće polje; posle telefona stane na "Sačuvaj" (uokvireno), a dodir na njega čuva termin.' },
+    { t:'Dodaj', c:'Dodir na Dodaj odmah otvara kalendar; posle datuma izađe panel "U koliko sati?" (sat, pa minuti :00/:15/:30/:45), a dodir na minut otvara tastaturu za ime. Dugme "Dodaj" gore otvara prazan obrazac za ručni unos: datum, vreme, ime i prezime (obavezno), auto, prečnik (ukucaš 16 → R16), iznos, napomena i telefon. Pored telefona: 📞 otvara Telefon (Nedavni → drži prst na broju → Kopiraj → nazad), 📋 upisuje kopirani broj. Strelica na tastaturi prelazi na sledeće polje; posle telefona stane na "Sačuvaj" (uokvireno), a dodir na njega čuva termin.' },
     { t:'Spisak i prošli termini', c:'Na početnom ekranu su predstojeći termini po danima (Danas, Sutra, pa datumi), unutar dana po vremenu; uz svaki dan piše broj termina i ukupan iznos. Današnji termini ostaju ovde ceo dan. Dugme sa satom gore prikazuje prošle termine (najnoviji gore); ponovni dodir ili korak nazad vraća predstojeće.' },
     { t:'Pretraga i prikaz', c:'"Pretraži" traži po imenu, autu, prečniku, napomeni, telefonu i iznosu, u predstojećim i prošlim terminima. Ikonica ▦/☰ menja prikaz između liste i mreže. Na kartici je ime, a ispod sitno auto, prečnik, napomena i telefon (dodir na broj zove); iznos je desno.' },
     { t:'Sortiranje', c:'"Sortiraj": "Datum i vreme" ređa termine po danu, pa po vremenu. "Ručno (ručke)" prikaže ručku (⠿) desno na svakoj kartici: drži je i prevuci karticu na novo mesto, u okviru istog dana. Ručni redosled se pamti.' },
