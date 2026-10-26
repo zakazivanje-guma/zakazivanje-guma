@@ -704,6 +704,9 @@ html .home-sq-row{ margin:0 !important; }
 html .home-sq{ gap:3px; }
 html .topbar .backup-reminder-row{ margin-bottom:6px; }
 
+/* v14 (Zoran 26.10.): dug pritisak ne označava tekst ni otvara Chrome-ov meni; polja za unos ostaju normalna */
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default;}
 </style>
 </head>
 <body>
@@ -1294,7 +1297,7 @@ function apptCardHtml(it, grid, handle){
     .concat(it.telefon ? ['<a class="tel-link" href="'+telHref(it.telefon)+'" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()">'+escapeHtml(it.telefon)+'</a>'] : []).join(' · ');
   const badge = clash ? '<div class="med-badge'+(grid?' gc-badge':'')+' badge-expired">isto vreme</div>'
                       : (fmtIznos(it.iznos) ? '<div class="med-badge'+(grid?' gc-badge':'')+' badge-ok">'+escapeHtml(fmtIznos(it.iznos))+'</div>' : '');
-  const ev = ' id="item-'+it.id+'" data-id="'+it.id+'" onclick="handleCardClick(\''+it.id+'\')" onpointerdown="startCardLongPress(\''+it.id+'\')" onpointerup="cancelCardLongPress()" onpointerleave="cancelCardLongPress()" onpointercancel="cancelCardLongPress()"';
+  const ev = ' id="item-'+it.id+'" data-id="'+it.id+'" onclick="handleCardClick(\''+it.id+'\')" onpointerdown="startCardLongPress(\''+it.id+'\')" onpointerup="cancelCardLongPress()" onpointerleave="cancelCardLongPress()" onpointercancel="cancelCardLongPress()" oncontextmenu="event.preventDefault()"';
   const thumb = '<div class="med-thumb"><span class="t-time">'+escapeHtml(it.vreme||'—')+'</span></div>';
   const h = handle ? '<div class="drag-handle" aria-label="Premesti">'+HANDLE_SVG+'</div>' : '';
   if(grid) return '<div class="grid-card'+(handle?' has-handle':'')+'"'+ev+'>'+thumb+
@@ -1405,7 +1408,7 @@ function confirmDeleteItem(id, swapFromFn){
 }
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 13; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 14; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
