@@ -1397,8 +1397,7 @@ function openReviveForm(id, fromFn){
   formDraft.datum = ''; formDraft.vreme = '';
   renderItemForm();
   showNote('Izaberi nov dan i vreme za '+(formDraft.ime||'klijenta')+' — ostali podaci su već upisani.', { ms: 6000 });
-  const d = document.getElementById('fDatum');
-  if(d){ try{ d.showPicker(); }catch(e){ d.focus(); } }
+  openDatePicker();
 }
 /* stari klijent: nov termin, a isti klijent (ime ili telefon) postoji u Završenom → ponuda da se vrati njegov termin */
 let retCloseFn = null, __retRevive = null, __retNew = null, __retCancel = null;
@@ -1583,7 +1582,7 @@ function confirmDeleteItem(id, swapFromFn){
 }
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 15; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 16; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -2014,9 +2013,19 @@ function updateDraft(field, value){ formDraft[field] = value; refreshFormWarning
 /* v9: novi termin redom — kalendar → panel za vreme → tastatura za ime (Zoran 24.10.) */
 function openNewForm(){
   openItemForm(null);
-  const d = document.getElementById('fDatum');
-  if(!d) return;
-  try{ d.showPicker(); }catch(e){ d.focus(); }
+  openDatePicker();
+}
+/* v16: Chrome zatvara kalendar i ODBACUJE izabrani datum kad se polju datuma iznova pravi raspored na ekranu
+   (Chromium HTMLInputElement::DetachLayoutTree → ClosePopupView). Polje je tek ubačeno u obrazac, pa se kalendar
+   otvara tek kad je obrazac nacrtan (dva okvira, ~30 ms; dozvola posle dodira traje 5 s — kActivationLifespan). */
+function openDatePicker(){
+  const d0 = document.getElementById('fDatum'); if(!d0) return;
+  void d0.offsetWidth;
+  requestAnimationFrame(()=> requestAnimationFrame(()=>{
+    const d = document.getElementById('fDatum');
+    if(!d || !formDraft || !d.isConnected) return;
+    try{ d.showPicker(); }catch(e){ d.focus(); }
+  }));
 }
 function onDatumChange(el){
   updateDraft('datum', el.value);
