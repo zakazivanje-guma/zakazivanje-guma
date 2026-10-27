@@ -1,6 +1,6 @@
 /* Service worker: NETWORK-FIRST.
    Uvek prvo traži najnoviju verziju sa mreže; sačuvana kopija se koristi samo kada nema interneta. */
-const CACHE_NAME = 'zakazivanje-cache-v18';
+const CACHE_NAME = 'zakazivanje-cache-v19';
 const FILES_TO_CACHE = [
   './',
   './index.html',

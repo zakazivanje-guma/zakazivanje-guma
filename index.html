@@ -813,6 +813,8 @@ function dayLabel(iso){
 }
 /* današnji termini ostaju u predstojećim ceo dan */
 function isPast(it){ return it.datum < todayISO(); }
+/* v19: dan I vreme su prošli (Vrati iz Završenog) */
+function isPastDT(datum, vreme){ const d = new Date(datum+'T'+(vreme||'00:00')+':00'); return !isNaN(d) && d.getTime() <= Date.now(); }
 /* v14 (Zoran 26.10.): „Završeno“ = samo ono što je prevučeno udesno (polje zavrseno = vreme označavanja, null = zakazano).
    Termin kome je prošao datum ostaje u zakazanima (crven naslov dana) dok se ne označi. */
 function isDone(it){ return !!it.zavrseno; }
@@ -1396,7 +1398,7 @@ function selDelete(){
 function reviveItems(ids, fromFn){
   const t = todayISO();
   const list = ids.map(getItem).filter(Boolean);
-  if(list.length===1 && list[0].datum < t){ if(fromFn) closeOverlay(fromFn); openReviveDate(list[0].id); return; }
+  if(list.length===1 && isPastDT(list[0].datum, list[0].vreme)){ if(fromFn) closeOverlay(fromFn); openReviveDate(list[0].id); return; }
   list.forEach(it=>{ it.zavrseno = null; });
   persistItems(true);
   if(fromFn) closeOverlay(fromFn); else render();
@@ -1423,6 +1425,10 @@ function openReviveDate(id){
 function reviveOnDate(id, datum, vreme){
   const it = getItem(id);
   if(!it || !/^\d{4}-\d{2}-\d{2}$/.test(datum) || !/^\d{2}:\d{2}$/.test(vreme||'')) return;
+  if(isPastDT(datum, vreme)){   /* v19: prošlo vreme se ne prihvata — panel ostaje za drugo vreme */
+    showBanner('Vreme '+vreme+' je prošlo — izaberi kasnije vreme.');
+    openTimePicker(t=>reviveOnDate(id, datum, t), ''); return;
+  }
   const go = ()=>{
     const old = { datum: it.datum, vreme: it.vreme, zavrseno: it.zavrseno };
     it.datum = datum; it.vreme = vreme; it.zavrseno = null;
@@ -1756,7 +1762,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 18; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 19; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -2826,7 +2832,7 @@ function openHelpScreen(){
     { t:'Isto vreme', c:'Ako u isto vreme (isti dan i sat) već postoji termin, aplikacija pita da li ipak dodaješ. Takvi termini na spisku imaju oznaku "isto vreme", a u obrascu piše ko je već zakazan.' },
     { t:'Dodaj', c:'Dodir na Dodaj odmah otvara kalendar; posle datuma izađe panel "U koliko sati?" (sat, pa minuti :00/:15/:30/:45), a dodir na minut otvara tastaturu za ime. Za tačno vreme dodirni ⌨️ u panelu i ukucaj cifre (1035 = 10:35, 24 sata), pa Upiši. Dugme "Dodaj" gore otvara prazan obrazac za ručni unos: datum, vreme, ime i prezime (obavezno), auto, prečnik (ukucaš 16 → R16), iznos, napomena i telefon. Pored telefona: 📞 otvara Telefon (Nedavni → drži prst na broju → Kopiraj → nazad), 📋 upisuje kopirani broj. Strelica na tastaturi prelazi na sledeće polje; posle telefona stane na "Sačuvaj" (uokvireno), a dodir na njega čuva termin.' },
     { t:'Zakazano i Završeno', c:'Na početnom ekranu su zakazani termini po danima, unutar dana po vremenu; uz svaki dan piše broj termina i ukupan iznos. Povuci karticu udesno: pojavi se zeleno "Završeno", dodir na njega prebacuje termin u Završeno. Termin kome je prošao dan, a nije završen, ostaje gore sa crvenim naslovom "Prošlo". Kvadrat "Završeno" otvara završene termine (najnoviji gore); ponovni dodir ili korak nazad vraća zakazane.' },
-    { t:'Vraćanje iz Završenog', c:'U Završenom drži prst na kartici: uključi se označavanje (dodirom dodaješ ili skidaš kartice, "Označi sve" gore). Dole "Vrati u zakazane" ili "Obriši" (ide u korpu); ✕ ili korak nazad prekida. Može i prevlačenjem udesno: "Vrati". Termin sa starim datumom otvara kalendar: izabereš nov dan, pa sat i minute; ostali podaci ostaju. Kad unosiš nov termin, a isti klijent (ime ili telefon) postoji u Završenom, aplikacija pita: "Vrati njega" upiše sve njegove podatke, "Novi klijent" pravi nov termin.' },
+    { t:'Vraćanje iz Završenog', c:'U Završenom drži prst na kartici: uključi se označavanje (dodirom dodaješ ili skidaš kartice, "Označi sve" gore). Dole "Vrati u zakazane" ili "Obriši" (ide u korpu); ✕ ili korak nazad prekida. Može i prevlačenjem udesno: "Vrati". Termin kome je prošlo vreme otvara kalendar: izabereš nov dan, pa sat i minute (prošlo vreme se ne prihvata); ostali podaci ostaju. Kad unosiš nov termin, a isti klijent (ime ili telefon) postoji u Završenom, aplikacija pita: "Vrati njega" upiše sve njegove podatke, "Novi klijent" pravi nov termin.' },
     { t:'Pretraga i prikaz', c:'"Pretraži" traži po imenu, autu, prečniku, napomeni, telefonu i iznosu, uvek i u zakazanim i u završenim (prvo zakazani), bez obzira na kvačice, velika slova i ćirilicu ili latinicu. Ikonica ▦/☰ menja prikaz između liste i mreže. Na kartici je ime, a ispod sitno auto, prečnik, napomena i telefon (dodir na broj zove); iznos je desno.' },
     { t:'Sortiranje', c:'"Sortiraj": "Datum i vreme" ređa termine po danu, pa po vremenu. "Ručno (ručke)" prikaže ručku (⠿) desno na svakoj kartici: drži je i prevuci karticu na novo mesto, u okviru istog dana. Ručni redosled se pamti.' },
     { t:'Izmena podataka', c:'Dodir na polje ga osenči: Backspace te vrati na prethodno polje bez brisanja, a prvo slovo ili mikrofon zameni stari tekst novim. Drugi dodir vraća tekst u polje za uređivanje dela teksta. Ako izađeš bez unosa, stari tekst ostaje. Taster za brisanje na označenom ili praznom polju ne briše, nego te vrati na prethodno polje.' },
