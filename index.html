@@ -248,6 +248,11 @@
   .attach-menu-opt .ao-icon{ width:54px; height:54px; border-radius:50%; background:var(--bg-elevated); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:22px; }
   .attach-menu-opt span{ font-size:12px; color:var(--text); font-weight:600; }
   .backup-reminder-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--coral); color:var(--on-danger); font-size:12px; font-weight:600; padding:9px 11px; border-radius:11px; margin-bottom:9px; }
+  .cal-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--green-deep); color:#fff; font-size:12.5px; font-weight:600; padding:9px 11px; border-radius:11px; margin-bottom:9px; }
+  .cal-row button{ flex:none; background:rgba(255,255,255,0.18); color:inherit; border:1px solid rgba(255,255,255,0.45); padding:7px 12px; border-radius:8px; font-weight:700; font-size:12px; font-family:inherit; cursor:pointer; }
+  .cal-min{ display:flex; gap:8px; flex-wrap:wrap; margin:6px 0 4px; }
+  .cal-min button{ flex:1; min-width:64px; padding:12px 0; border-radius:12px; border:1px solid var(--line); background:var(--bg-card); color:var(--text); font:inherit; font-weight:700; cursor:pointer; }
+  .cal-min button.on{ background:var(--green-deep); color:#fff; border-color:var(--green-deep); }
   .backup-reminder-row button{ flex:none; background:rgba(255,255,255,0.2); color:inherit; border:1px solid rgba(255,255,255,0.4); padding:6px 11px; border-radius:8px; font-weight:700; font-size:11.5px; font-family:inherit; cursor:pointer; }
   .photo-full-close{ position:absolute; top:18px; right:18px; width:36px; height:36px; border-radius:50%; background:rgba(255,255,255,0.15); border:none; color:#fff; font-size:16px; cursor:pointer; }
 
@@ -1095,7 +1100,7 @@ function backupReminderHtml(){
     (canShareBackup() ? '<button onclick="shareBackup()">podeli kopiju</button>' : '<button onclick="exportBackup()">izvezi bekap</button>')+
     '</div>';
 }
-function persistItems(){ return persistChecked('zg:items', JSON.stringify(items)); }
+function persistItems(){ const ok = persistChecked('zg:items', JSON.stringify(items)); if(ok) calAfterChange(); return ok; }
 function loadItems(){
   const saved = lsGet('zg:items');
   if(saved && saved.value){ try{ items = JSON.parse(saved.value); }catch(e){} }
@@ -1528,7 +1533,7 @@ function render(){
 
   app.innerHTML =
     '<div class="topbar">'+
-    backupReminderHtml()+
+    backupReminderHtml()+'<div id="calStrip">'+calStripHtml()+'</div>'+
     '<div class="home-head"><span class="home-mark">'+HOME_IC.mark+'</span>'+
     '<div class="home-tt"><div class="app-title serif">'+(pastOnly?'Završeno':'Zakazivanje guma')+'</div><div class="home-count">'+countTitle+' ('+n+')</div></div>'+
     '<button class="icon-btn" onclick="toggleViewMode()" title="Promeni prikaz">'+(settings.viewMode==='mreza'?ic('☰','list'):ic('▦','grid'))+'</button>'+
@@ -1588,8 +1593,145 @@ function confirmDeleteItem(id, swapFromFn){
   }, null, swapFromFn);
 }
 
+
+/* ---------- GOOGLE KALENDAR (v17, Zoran 27.10.) ----------
+   Zakazani termini se sami upisuju, menjaju i brišu u Zoranovom Google kalendaru; podsetnik na zaključanom ekranu daje kalendar.
+   Proba 27.10. (kalendar-proba.html): upis radi, podsetnik stiže tačno. Zvanično (developers.google.com/identity/oauth2/web):
+   token model, ključ kratko traje (izmereno 60 min) i nov se traži SAMO dodirom korisnika, kroz Google-ov prozor; prompt '' =
+   saglasnost samo prvi put. Zato: posle izmene, dok još traje dodir (navigator.userActivation), sam traži ključ; inače traka
+   „Kalendar čeka“ sa dugmetom. Poređenje (calOps): u kalendaru su budući zakazani termini; izmena → PATCH, završen/obrisan → DELETE,
+   prošao termin se ne dira. Mapa id termina → id događaja u zg:cal (ne ide u bekap). Client ID je u projektu Arhive (arhiva-512318). */
+const CAL_CLIENT_ID = '535678356593-o5ck1d63s72a9uu0i6m82qn2cv4d290h.apps.googleusercontent.com';
+const CAL_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+const CAL_API = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+const CAL_MINS = [15, 30, 60, 120];
+let calTok = null, calTokTo = 0, calClient = null, calGisP = null, calBusy = false, calWaitTok = false, calErr = '';
+function calCfg(){ const v = lsGet('zg:cal'); let c = null; try{ c = v && v.value ? JSON.parse(v.value) : null; }catch(e){} c = c || {}; if(!c.map) c.map = {}; if(!CAL_MINS.includes(c.min)) c.min = 30; return c; }
+function calSave(c){ return persistChecked('zg:cal', JSON.stringify(c)); }
+function calHasTok(){ return !!calTok && Date.now() < calTokTo - 60000; }
+function calStart(it){ const d = new Date(it.datum+'T'+(it.vreme||'00:00')+':00'); return isNaN(d) ? null : d; }
+function calWanted(it){ if(!it || isDone(it) || !it.datum || !it.vreme) return false; const d = calStart(it); return !!d && d.getTime() > Date.now(); }
+function calHash(it, c){ return JSON.stringify([it.datum, it.vreme, it.ime, it.auto, it.dimenzije, it.telefon, it.iznos, it.napomena, c.min]); }
+function calOps(){
+  const c = calCfg(), ops = [];
+  if(!c.on) return ops;
+  items.forEach(it=>{ if(!calWanted(it)) return; const m = c.map[it.id];
+    if(!m) ops.push({ t:'add', id:it.id }); else if(m.h !== calHash(it, c)) ops.push({ t:'upd', id:it.id }); });
+  Object.keys(c.map).forEach(id=>{ const it = getItem(id);
+    if(!it || isDone(it)) ops.push({ t:'del', id }); });
+  return ops;
+}
+function calEvent(it, c){
+  const st = calStart(it), en = new Date(st.getTime() + 30*60000);
+  const dim = String(it.dimenzije||'').trim();
+  const lines = [ dim ? 'Prečnik: '+(/^\d/.test(dim) ? 'R'+dim : dim) : '', it.telefon ? 'Telefon: '+it.telefon : '',
+    (it.iznos!=null && it.iznos!=='') ? 'Iznos: '+it.iznos+' din' : '', it.napomena ? 'Napomena: '+it.napomena : '', 'Iz aplikacije Zakazivanje guma' ].filter(Boolean);
+  return { summary: (it.ime||'Termin')+(it.auto ? ' – '+it.auto : ''), description: lines.join('\n'),
+    start: { dateTime: st.toISOString() }, end: { dateTime: en.toISOString() },
+    reminders: { useDefault: false, overrides: [ { method: 'popup', minutes: c.min } ] } };
+}
+function calLoadGis(){
+  if(calGisP) return calGisP;
+  calGisP = new Promise(res=>{
+    const sc = document.createElement('script'); sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true;
+    sc.onload = ()=>{ try{
+      calClient = google.accounts.oauth2.initTokenClient({ client_id: CAL_CLIENT_ID, scope: CAL_SCOPE, prompt: '',
+        callback: r=>{ calWaitTok = false;
+          if(r && r.access_token){ calTok = r.access_token; calTokTo = Date.now() + (+r.expires_in||3600)*1000; calErr = '';
+            const c = calCfg(); if(!c.on){ c.on = true; calSave(c); showNote('Google kalendar je povezan. Budući termini idu u kalendar.'); }
+            calRun(); }
+          else { calErr = 'Google nije dao dozvolu.'; logError('kalendar', JSON.stringify(r)); calUi(); } },
+        error_callback: e=>{ calWaitTok = false; calErr = 'Google prozor je zatvoren.'; calUi(); } });
+      }catch(e){ logError('kalendar', e.message); } calUi(); res(); };
+    sc.onerror = ()=>{ calGisP = null; calErr = 'Google se ne učitava (internet?).'; calUi(); res(); };
+    document.head.appendChild(sc);
+  });
+  return calGisP;
+}
+function calAskTok(){
+  if(!calClient){ calLoadGis(); showNote('Google se još učitava — dodirni ponovo za sekund.'); return; }
+  calWaitTok = true; calUi();
+  try{ calClient.requestAccessToken(); }catch(e){ calWaitTok = false; logError('kalendar', e.message); calUi(); }
+}
+/* posle svake sačuvane izmene termina (persistItems) */
+function calAfterChange(){
+  const c = calCfg(); if(!c.on) return;
+  calLoadGis();
+  if(!calOps().length) return;
+  if(calHasTok()){ calRun(); return; }
+  const act = navigator.userActivation ? navigator.userActivation.isActive : false;
+  if(act && calClient && !calWaitTok) setTimeout(calAskTok, 0); else setTimeout(calUi, 0);
+}
+function calSendNow(){ if(calHasTok()) calRun(); else calAskTok(); }
+async function calApi(method, url, body){
+  const r = await fetch(url, { method, headers: { 'Authorization': 'Bearer '+calTok, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  let j = null; if(r.status !== 204){ try{ j = await r.json(); }catch(e){} }
+  return { st: r.status, j };
+}
+async function calRun(){
+  if(calBusy || !calHasTok()) { calUi(); return; }
+  calBusy = true; calUi();
+  let done = 0;
+  try{
+    for(let guard = 0; guard < 500; guard++){
+      const op = calOps()[0]; if(!op) break;
+      const c = calCfg(), it = getItem(op.id), m = c.map[op.id];
+      let r;
+      if(op.t === 'del'){
+        r = await calApi('DELETE', CAL_API+'/'+encodeURIComponent(m.e));
+        if(r.st === 204 || r.st === 200 || r.st === 404 || r.st === 410){ const c2 = calCfg(); delete c2.map[op.id]; calSave(c2); done++; continue; }
+      } else {
+        const ev = calEvent(it, c);
+        if(op.t === 'upd'){
+          r = await calApi('PATCH', CAL_API+'/'+encodeURIComponent(m.e), ev);
+          if(r.st === 404 || r.st === 410) r = await calApi('POST', CAL_API, ev);
+        } else r = await calApi('POST', CAL_API, ev);
+        if(r.st === 200 && r.j && r.j.id){ const c2 = calCfg(); const it2 = getItem(op.id); if(it2) c2.map[op.id] = { e: r.j.id, h: calHash(it2, c2) }; calSave(c2); done++; continue; }
+      }
+      if(r.st === 401){ calTok = null; calErr = ''; break; }
+      calErr = 'Kalendar je odbio izmenu (greška '+r.st+').'; logError('kalendar', op.t+' HTTP '+r.st+' '+JSON.stringify(r.j||'').slice(0,300)); break;
+    }
+  }catch(e){ calErr = 'Nema interneta — izmene čekaju.'; logError('kalendar', e.message); }
+  calBusy = false; calUi();
+}
+function calStripHtml(){
+  const c = calCfg(); if(!c.on) return '';
+  const n = calOps().length; if(!n) return '';
+  if(calBusy) return '<div class="cal-row"><span>📅 Šaljem u kalendar…</span></div>';
+  return '<div class="cal-row"><span>📅 '+(calErr ? escapeHtml(calErr)+' ' : '')+'Kalendar čeka: '+n+' '+(n===1?'izmena':'izmene')+'</span>'+
+    '<button onclick="calSendNow()">Pošalji</button></div>';
+}
+function calTileSub(){ const c = calCfg(); if(!c.on) return 'Nije povezan'; const n = calOps().length; return 'Povezan · podsetnik '+c.min+' min pre'+(n ? ' · čeka '+n : ''); }
+function calBodyHtml(){
+  const c = calCfg(), n = calOps().length;
+  if(!c.on) return '<div class="field-hint" style="margin-bottom:16px;">Zakazani termini se sami upisuju u tvoj Google kalendar, menjaju i brišu kad ih ovde promeniš ili obrišeš. Kalendar ti šalje podsetnik na zaključan ekran.</div>'+
+    '<div class="modal-actions"><button class="save-btn" onclick="calAskTok()">Poveži sa Google kalendarom</button></div>'+
+    (calErr ? '<div class="field-hint" style="margin-top:12px; color:var(--coral); font-weight:700;">'+escapeHtml(calErr)+'</div>' : '');
+  return '<div class="field-hint" style="margin-bottom:12px;"><b>Povezano.</b> Budući zakazani termini su u Google kalendaru. Završeni i obrisani se brišu iz kalendara.'+
+    (calWaitTok ? '<br>Čekam Google…' : calBusy ? '<br>Šaljem u kalendar…' : n ? '<br>Čeka slanje: '+n+'.' : '<br>Sve je poslato.')+'</div>'+
+    (n && !calBusy ? '<div class="modal-actions" style="margin-bottom:14px;"><button class="save-btn" onclick="calSendNow()">Pošalji sada</button></div>' : '')+
+    '<div class="field"><label>Podsetnik pre termina</label><div class="cal-min">'+
+    CAL_MINS.map(m=>'<button class="'+(m===c.min?'on':'')+'" onclick="calSetMin('+m+')">'+(m<60 ? m+' min' : (m/60)+' h')+'</button>').join('')+'</div></div>'+
+    (calErr ? '<div class="field-hint" style="color:var(--coral); font-weight:700;">'+escapeHtml(calErr)+'</div>' : '')+
+    '<div class="modal-actions" style="margin-top:18px;"><button class="cancel-btn" style="flex:1;" onclick="calOff()">Prekini vezu</button></div>'+
+    '<div class="field-hint">Prekid veze: termini koji su već u kalendaru ostaju tamo; nove promene se više ne šalju.</div>';
+}
+function calSetMin(m){ const c = calCfg(); c.min = m; calSave(c); calUi(); showNote('Podsetnik: '+(m<60 ? m+' min' : (m/60)+' h')+' pre termina.'); calAfterChange(); }
+function calOff(){
+  showConfirm('Prekinuti vezu sa Google kalendarom? Termini koji su već tamo ostaju.', ()=>{
+    const c = calCfg(); c.on = false; calSave(c);
+    try{ if(calTok && window.google) google.accounts.oauth2.revoke(calTok, ()=>{}); }catch(e){}
+    calTok = null; calErr = ''; calUi(); showNote('Veza sa kalendarom je prekinuta.');
+  }, 'Da, prekini');
+}
+function calUi(){
+  const b = document.getElementById('calBody'); if(b) b.innerHTML = calBodyHtml();
+  const st = document.getElementById('calStrip'); if(st) st.innerHTML = calStripHtml();   /* samo traka — render bi obrisao kucani tekst */
+}
+if(calCfg().on) calLoadGis();
+
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 16; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 17; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -2454,6 +2596,7 @@ function renderSettingsTiles(){
     settingsTile('📖','Uputstvo za korišćenje','Kako se koristi aplikacija','openHelpScreen()')+
     settingsTile('🎨','Tema', themeName(getTheme()),'openSettingsSub(\'theme\')')+
     settingsTile('💾','Rezervna kopija', last ? 'Poslednja: '+lastBackupDisplay() : 'Još nije napravljena','openSettingsSub(\'backup\')')+
+    settingsTile('📅','Google kalendar', calTileSub(),'openSettingsSub(\'cal\')')+
     settingsTile('🔑','Gemini API ključ', getApiKey() ? 'Ključ je unet' : 'Ključ nije unet','openSettingsSub(\'apikey\')')+
     settingsTile('🗑','Korpa', trashTileSub(),'openTrashScreen()'));
 }
@@ -2507,6 +2650,10 @@ function openSettingsSub(key){
       daysFieldHtml('backupIntervalInput', getBackupIntervalDays())+'</div>'+
       '<div class="field-hint">Kad prođe ovoliko dana od poslednjeg bekapa, gore na vrhu će se pojaviti podsetnik.</div>'+
       '<div class="field-hint" id="persistHint" style="margin-top:18px;">'+persistHintText()+'</div>';
+  } else if(key==='cal'){
+    title='Google kalendar';
+    body='<div id="calBody">'+calBodyHtml()+'</div>';
+    calLoadGis();
   } else if(key==='errlog'){
     title='Dnevnik grešaka';
     body=errLogBodyHtml();
@@ -2646,6 +2793,7 @@ function openHelpScreen(){
     { t:'Unos termina', c:'Dole u polje ukucaj ili izgovori termin (mikrofon na tastaturi), npr. "sutra u 10 Petar Petrović, Golf 7, R16, 4500, doneće svoje gume, telefon 064 123 45 67" (redosled kao na kartici; dok kucaš, podsetnik stoji u dnu polja), pa dugme za slanje ili Enter. Polje se raširi dok pišeš. AI sam rasporedi podatke i termin se odmah sačuva; gore piše šta je sačuvano, a nova kartica kratko zasija. AI razume danas, sutra, prekosutra, "u petak", "u pola 11" (10:30).' },
     { t:'Ispravka', c:'Dodir na karticu odmah otvara izmenu (prozor odozdo); gore uz ime je "Obriši" (termin ide u korpu). Polja koja nisu uneta imaju crven naziv. Dug pritisak (drži prst) na kartici otvara brzi meni: Izmeni ili Obriši.' },
     { t:'Kad nešto nedostaje', c:'Datum, vreme i ime su obavezni. Ako AI ne prepozna neko od njih, otvori se izmena sa onim što je razumeo; šta nije uneto ima crven naziv, a obavezna polja i crven okvir. Termin se čuva tek kad dopuniš obavezno.' },
+    { t:'Google kalendar', c:'Podešavanja → Google kalendar → Poveži (prvi put izabereš nalog i dozvoliš). Posle toga se budući zakazani termini sami upisuju u Google kalendar, a izmena ili brisanje ovde menja i kalendar; završeni i obrisani nestaju iz kalendara. Kalendar šalje podsetnik na zaključan ekran (15 min, 30 min, 1 h ili 2 h pre, biraš u Podešavanjima). Google ponekad ponovo traži potvrdu: posle čuvanja na trenutak iskoči Google-ov prozor, ili gore piše "Kalendar čeka" pa dodirneš Pošalji.' },
     { t:'Isto vreme', c:'Ako u isto vreme (isti dan i sat) već postoji termin, aplikacija pita da li ipak dodaješ. Takvi termini na spisku imaju oznaku "isto vreme", a u obrascu piše ko je već zakazan.' },
     { t:'Dodaj', c:'Dodir na Dodaj odmah otvara kalendar; posle datuma izađe panel "U koliko sati?" (sat, pa minuti :00/:15/:30/:45), a dodir na minut otvara tastaturu za ime. Za tačno vreme dodirni ⌨️ u panelu i ukucaj cifre (1035 = 10:35, 24 sata), pa Upiši. Dugme "Dodaj" gore otvara prazan obrazac za ručni unos: datum, vreme, ime i prezime (obavezno), auto, prečnik (ukucaš 16 → R16), iznos, napomena i telefon. Pored telefona: 📞 otvara Telefon (Nedavni → drži prst na broju → Kopiraj → nazad), 📋 upisuje kopirani broj. Strelica na tastaturi prelazi na sledeće polje; posle telefona stane na "Sačuvaj" (uokvireno), a dodir na njega čuva termin.' },
     { t:'Zakazano i Završeno', c:'Na početnom ekranu su zakazani termini po danima, unutar dana po vremenu; uz svaki dan piše broj termina i ukupan iznos. Povuci karticu udesno: pojavi se zeleno "Završeno", dodir na njega prebacuje termin u Završeno. Termin kome je prošao dan, a nije završen, ostaje gore sa crvenim naslovom "Prošlo". Kvadrat "Završeno" otvara završene termine (najnoviji gore); ponovni dodir ili korak nazad vraća zakazane.' },
