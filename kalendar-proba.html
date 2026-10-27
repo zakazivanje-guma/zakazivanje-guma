@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="sr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proba: Google kalendar</title>
+<!-- Proba 27.10.2026: da li Zakazivanje može samo da upisuje/briše termine u Zoranovom Google kalendaru
+     (token model, Google Identity Services). Nije deo aplikacije; ne briše ništa osim probnog termina. -->
+<script src="https://accounts.google.com/gsi/client" async onload="gisReady()"></script>
+<style>
+  body{ margin:0; padding:16px; font:17px/1.4 system-ui,sans-serif; background:#EAE1C7; color:#2B2B24; }
+  h1{ font-size:21px; margin:4px 0 14px; }
+  button{ display:block; width:100%; margin:0 0 10px; padding:15px; font:inherit; font-weight:700; border:none; border-radius:12px; background:#28402F; color:#fff; }
+  button:disabled{ opacity:.4; }
+  button.sec{ background:#FFFFFE; color:#2B2B24; border:1px solid #D6C79E; }
+  #stanje{ background:#FFFFFE; border:1px solid #D6C79E; border-radius:12px; padding:12px; margin:0 0 12px; }
+  #log{ font-size:14px; background:#FFFFFE; border:1px solid #D6C79E; border-radius:12px; padding:10px; white-space:pre-wrap; word-break:break-word; }
+</style>
+</head>
+<body>
+<h1>Proba: Google kalendar</h1>
+<div id="stanje">Učitavam Google…</div>
+<button id="bPovezi" onclick="povezi()" disabled>1. Poveži sa kalendarom</button>
+<button id="bUpisi" onclick="upisi()" disabled>2. Upiši probni termin za 10 min</button>
+<button id="bObrisi" onclick="obrisi()" disabled>3. Obriši probni termin</button>
+<button class="sec" onclick="kopiraj()">Kopiraj dnevnik</button>
+<div id="log"></div>
+<script>
+const CLIENT_ID = '535678356593-o5ck1d63s72a9uu0i6m82qn2cv4d290h.apps.googleusercontent.com';
+const SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+const API = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+let client = null, token = null, tokenDo = 0, posle = null, tStart = 0;
+const $ = id => document.getElementById(id);
+function vreme(d){ d = d || new Date(); return d.toLocaleTimeString('sr-RS',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+function log(t){ const l = $('log'); l.textContent = vreme()+'  '+t+'\n'+l.textContent; try{ localStorage.setItem('kp:log', l.textContent.slice(0,6000)); }catch(e){} }
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ v==null ? localStorage.removeItem(k) : localStorage.setItem(k,v); }catch(e){} }
+function osvezi(){
+  const ok = token && Date.now() < tokenDo;
+  const ev = lsGet('kp:event');
+  $('stanje').innerHTML = (ok ? 'Povezano. Ključ važi još <b>'+Math.round((tokenDo-Date.now())/60000)+' min</b>.' : (client ? 'Nije povezano (ili je ključ istekao).' : 'Učitavam Google…'))
+    + (lsGet('kp:prvi') ? '<br>Prvo povezivanje: '+lsGet('kp:prvi') : '')
+    + (ev ? '<br>Probni termin postoji (upisan '+(lsGet('kp:eventT')||'?')+').' : '');
+  $('bPovezi').disabled = !client;
+  $('bUpisi').disabled = !client || !!ev;
+  $('bObrisi').disabled = !client || !ev;
+}
+setInterval(osvezi, 20000);
+function gisReady(){
+  try{
+    client = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID, scope: SCOPE, prompt: '',
+      callback: r => {
+        const ms = Date.now() - tStart;
+        if(r && r.access_token){
+          token = r.access_token; tokenDo = Date.now() + (+r.expires_in||0)*1000;
+          if(!lsGet('kp:prvi')) lsSet('kp:prvi', new Date().toLocaleString('sr-RS'));
+          log('Ključ dobijen za '+(ms/1000).toFixed(1)+' s, važi '+Math.round((+r.expires_in||0)/60)+' min.');
+          const f = posle; posle = null; osvezi(); if(f) f();
+        } else { log('Google vratio grešku: '+JSON.stringify(r)); posle = null; osvezi(); }
+      },
+      error_callback: e => { log('Prozor zatvoren / greška: '+(e && (e.type||e.message) || e)); posle = null; osvezi(); }
+    });
+    log('Google učitan.');
+  }catch(e){ log('Greška pri učitavanju Google-a: '+e.message); }
+  osvezi();
+}
+function kljuc(f){
+  if(token && Date.now() < tokenDo - 60000){ f(); return; }
+  posle = f; tStart = Date.now(); log('Tražim ključ od Google-a (otvara se Google-ov prozor)…');
+  client.requestAccessToken();
+}
+function povezi(){ kljuc(()=> log('Povezivanje uspelo.')); }
+async function api(method, url, body){
+  const r = await fetch(url, { method, headers: { 'Authorization':'Bearer '+token, 'Content-Type':'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const txt = await r.text(); let j = null; try{ j = JSON.parse(txt); }catch(e){}
+  return { status: r.status, j, txt };
+}
+function upisi(){
+  kljuc(async ()=>{
+    const start = new Date(Date.now() + 10*60000), end = new Date(start.getTime() + 30*60000);
+    const ev = { summary: 'PROBA – Zakazivanje guma', description: 'Probni termin. Podsetnik treba da stigne oko '+vreme(new Date(start.getTime()-5*60000))+'.',
+      start: { dateTime: start.toISOString() }, end: { dateTime: end.toISOString() },
+      reminders: { useDefault: false, overrides: [ { method: 'popup', minutes: 5 } ] } };
+    try{
+      const r = await api('POST', API, ev);
+      if(r.status === 200 && r.j && r.j.id){
+        lsSet('kp:event', r.j.id); lsSet('kp:eventT', vreme());
+        log('Upisan termin u '+vreme(start)+'. Podsetnik treba da stigne oko '+vreme(new Date(start.getTime()-5*60000))+' — zaključaj telefon i sačekaj.');
+      } else log('Upis nije uspeo: HTTP '+r.status+' '+r.txt.slice(0,300));
+    }catch(e){ log('Upis nije uspeo (mreža): '+e.message); }
+    osvezi();
+  });
+}
+function obrisi(){
+  const id = lsGet('kp:event'); if(!id) return;
+  kljuc(async ()=>{
+    try{
+      const r = await api('DELETE', API+'/'+encodeURIComponent(id));
+      if(r.status === 204 || r.status === 410){ lsSet('kp:event', null); lsSet('kp:eventT', null); log('Probni termin obrisan iz kalendara (HTTP '+r.status+').'); }
+      else log('Brisanje nije uspelo: HTTP '+r.status+' '+r.txt.slice(0,300));
+    }catch(e){ log('Brisanje nije uspelo (mreža): '+e.message); }
+    osvezi();
+  });
+}
+function kopiraj(){
+  const t = 'kalendar-proba\n'+navigator.userAgent+'\n'+$('log').textContent;
+  (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(()=> log('Dnevnik kopiran.'), ()=> log('Kopiranje nije uspelo.'));
+}
+$('log').textContent = lsGet('kp:log') || '';
+log('Strana otvorena.');
+osvezi();
+</script>
+</body>
+</html>
