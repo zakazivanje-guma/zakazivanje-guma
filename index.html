@@ -610,6 +610,13 @@ input::selection, textarea::selection{ background:color-mix(in srgb, var(--frame
 .tp-b:disabled{ opacity:.4; }
 .tp-min{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
 .tp-min .tp-b{ height:54px; font-size:20px; }
+.tp-kb{ flex:none; width:44px; height:44px; border-radius:12px; border:1px solid var(--line); background:var(--bg); color:var(--text); font-size:22px; line-height:1; cursor:pointer; padding:0; margin-left:auto; margin-right:12px; }
+.tp-in-row{ display:flex; gap:8px; align-items:stretch; }
+.tp-in{ flex:1; min-width:0; height:54px; box-sizing:border-box; border-radius:12px; border:1px solid var(--line); background:var(--bg); color:var(--text); font:inherit; font-size:24px; font-weight:700; padding:0 14px; letter-spacing:1px; }
+.tp-in-ok{ flex:none; height:54px; padding:0 18px; border-radius:12px; border:none; background:var(--green-deep); color:#fff; font:inherit; font-size:17px; font-weight:700; cursor:pointer; }
+.tp-in-ok:disabled{ opacity:.4; }
+.tp-in-hint{ font-size:13.5px; color:var(--text-dim); margin:8px 4px 0; }
+.tp-in-hint.bad{ color:var(--coral); font-weight:700; }
 .tp-x{ margin-top:12px; height:44px; border-radius:12px; border:none; background:none; width:100%; font:inherit; font-size:15px; color:var(--text-dim); font-weight:600; cursor:pointer; }
 /* v13: osenčeno polje — prazno, a stari tekst se vidi kao osenčen predlog (vidi wireBackspace) */
 .form-full input.pre-sel, .form-full textarea.pre-sel{ background:color-mix(in srgb, var(--green-deep) 20%, var(--bg)); }
@@ -2033,11 +2040,11 @@ function onDatumChange(el){
 }
 
 /* ---------- PANEL ZA VREME (v9, umesto brojčanika): sat 0–23, pa minut → upiše, zatvori, fokus na Ime ---------- */
-let tpCloseFn = null, tpH = null, tpM = null;
+let tpCloseFn = null, tpH = null, tpM = null, tpKb = false;
 function openTimePicker(){
   if(!formDraft || document.getElementById('tpBackdrop')) return;
   const m = /^(\d{1,2}):(\d{2})$/.exec(formDraft.vreme || '');
-  tpH = m ? +m[1] : null; tpM = m ? m[2] : null;
+  tpH = m ? +m[1] : null; tpM = m ? m[2] : null; tpKb = false;
   const b = document.createElement('div');
   b.id = 'tpBackdrop'; b.className = 'tp-bg';
   b.addEventListener('click', e=>{ if(e.target === b) closeOverlay(tpCloseFn); });
@@ -2051,15 +2058,48 @@ function renderTimePicker(){
   const pad = n=> String(n).padStart(2,'0');
   const H = [...Array(24).keys()].map(h=>'<button type="button" class="tp-b'+(h===tpH?' on':'')+(h<7||h>20?' dim':'')+'" onclick="tpPickH('+h+')">'+h+'</button>').join('');
   const M = ['00','15','30','45'].map(mm=>'<button type="button" class="tp-b'+(mm===tpM && tpH!=null?' on':'')+'" onclick="tpPickM(\''+mm+'\')"'+(tpH==null?' disabled':'')+'>:'+mm+'</button>').join('');
-  b.innerHTML = '<div class="tp"><div class="tp-head"><span class="t">U koliko sati?</span><span class="v">'+(tpH==null?'--':pad(tpH))+':'+(tpM||'--')+'</span></div>'+
+  if(tpKb){
+    b.innerHTML = '<div class="tp"><div class="tp-head"><span class="t">Tačno vreme</span><span class="v" id="tpInV">--:--</span></div>'+
+      '<div class="tp-in-row"><input id="tpIn" class="tp-in" type="text" inputmode="numeric" enterkeyhint="done" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="npr. 1035" oninput="tpInInput()" onkeydown="if(event.key===\'Enter\'){event.preventDefault();tpInApply();}">'+
+      '<button type="button" class="tp-in-ok" id="tpInOk" onclick="tpInApply()" disabled>Upiši</button></div>'+
+      '<div class="tp-in-hint" id="tpInHint">Ukucaj sat i minute, 24 sata: 1035 = 10:35, 9 = 09:00</div>'+
+      '<button type="button" class="tp-x" onclick="tpKbSet(false)">Nazad na sate</button></div>';
+    const i = document.getElementById('tpIn'); if(i) i.focus();
+    return;
+  }
+  b.innerHTML = '<div class="tp"><div class="tp-head"><span class="t">U koliko sati?</span><button type="button" class="tp-kb" onclick="tpKbSet(true)" aria-label="Ukucaj tačno vreme">⌨️</button><span class="v">'+(tpH==null?'--':pad(tpH))+':'+(tpM||'--')+'</span></div>'+
     '<div class="tp-lab">1. Sat</div><div class="tp-grid">'+H+'</div>'+
     '<div class="tp-lab" style="margin-top:12px">2. Minuti — dodir upiše vreme i otvori Ime</div><div class="tp-min">'+M+'</div>'+
     '<button type="button" class="tp-x" onclick="closeOverlay(tpCloseFn)">Otkaži</button></div>';
 }
 function tpPickH(h){ tpH = h; renderTimePicker(); }
+/* v16: ⌨️ u panelu = tačno vreme tastaturom (Zoran 27.10.). Kod ne menja tekst u polju; vreme se vidi gore desno. */
+function tpKbSet(on){ tpKb = on; renderTimePicker(); }
+function tpParse(t){
+  const d = String(t||'').replace(/\D/g,'');
+  if(!d || d.length > 4) return null;
+  const h = d.length <= 2 ? +d : +d.slice(0, d.length-2), m = d.length <= 2 ? 0 : +d.slice(-2);
+  if(h > 23 || m > 59) return null;
+  return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+}
+function tpInInput(){
+  const i = document.getElementById('tpIn'); if(!i) return;
+  const v = tpParse(i.value), bad = i.value.replace(/\D/g,'') !== '' && !v;
+  const vv = document.getElementById('tpInV'); if(vv) vv.textContent = v || '--:--';
+  const ok = document.getElementById('tpInOk'); if(ok) ok.disabled = !v;
+  const h = document.getElementById('tpInHint');
+  if(h){ h.classList.toggle('bad', bad); h.textContent = bad ? 'Nije ispravno vreme (sat 0–23, minuti 0–59).' : 'Ukucaj sat i minute, 24 sata: 1035 = 10:35, 9 = 09:00'; }
+}
+function tpInApply(){
+  const i = document.getElementById('tpIn'); const v = i && tpParse(i.value);
+  if(!v){ tpInInput(); return; }
+  tpSetTime(v);
+}
 function tpPickM(mm){
   if(tpH == null) return;
-  const val = String(tpH).padStart(2,'0')+':'+mm;
+  tpSetTime(String(tpH).padStart(2,'0')+':'+mm);
+}
+function tpSetTime(val){
   closeOverlay(tpCloseFn);
   if(!formDraft) return;
   updateDraft('vreme', val);
