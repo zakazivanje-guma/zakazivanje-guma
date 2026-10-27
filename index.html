@@ -1391,7 +1391,7 @@ function selDelete(){
   };
   __confirmOwn = true;
 }
-/* Vrati u zakazane: jedan termin sa prošlim datumom → samo kalendar za nov dan (v18, Zoran 27.10.), vreme i podaci ostaju;
+/* Vrati u zakazane: jedan termin sa prošlim datumom → kalendar za dan, pa panel za vreme (v18, Zoran 27.10.), ostali podaci ostaju;
    ostali se samo vrate (prošao datum = crveno u zakazanima). Bez Google prozora (quiet). */
 function reviveItems(ids, fromFn){
   const t = todayISO();
@@ -1412,26 +1412,26 @@ function openReviveDate(id){
   let el = document.getElementById('rdDate');
   if(!el){
     el = document.createElement('input'); el.type = 'date'; el.id = 'rdDate'; el.className = 'rd-date'; el.tabIndex = -1; el.setAttribute('aria-hidden','true');
-    el.addEventListener('change', ()=>{ const v = el.value; if(v && rdId) reviveOnDate(rdId, v); });
+    el.addEventListener('change', ()=>{ const v = el.value, id = rdId; el.value = ''; rdId = null; const it = id && getItem(id);
+      if(v && it) openTimePicker(t=>reviveOnDate(id, v, t), it.vreme); });
     document.body.appendChild(el);
   }
   el.value = ''; el.min = todayISO();
   void el.offsetWidth;
   requestAnimationFrame(()=> requestAnimationFrame(()=>{ try{ el.showPicker(); }catch(e){ el.focus(); } }));
 }
-function reviveOnDate(id, datum){
-  const it = getItem(id); rdId = null;
-  const el = document.getElementById('rdDate'); if(el) el.value = '';
-  if(!it || !/^\d{4}-\d{2}-\d{2}$/.test(datum)) return;
+function reviveOnDate(id, datum, vreme){
+  const it = getItem(id);
+  if(!it || !/^\d{4}-\d{2}-\d{2}$/.test(datum) || !/^\d{2}:\d{2}$/.test(vreme||'')) return;
   const go = ()=>{
-    const old = { datum: it.datum, zavrseno: it.zavrseno };
-    it.datum = datum; it.zavrseno = null;
+    const old = { datum: it.datum, vreme: it.vreme, zavrseno: it.zavrseno };
+    it.datum = datum; it.vreme = vreme; it.zavrseno = null;
     if(!persistItems(true)){ Object.assign(it, old); render(); return; }
     render();
-    showNote('Vraćeno u zakazane: '+apptShort(it)+'. Vreme menjaš dodirom na termin.', { ms: 6000 });
+    showNote('Vraćeno u zakazane: '+apptShort(it), { ms: 5000 });
   };
-  const c = findClash(datum, it.vreme, id);
-  if(c){ showClashWarning('U '+it.vreme+' ('+dayLabel(datum)+') je već zakazan: '+(c.ime||'bez imena')+(c.auto?', '+c.auto:'')+'. Da li ipak želiš da vratiš i ovaj termin?', go); return; }
+  const c = findClash(datum, vreme, id);
+  if(c){ showClashWarning('U '+vreme+' ('+dayLabel(datum)+') je već zakazan: '+(c.ime||'bez imena')+(c.auto?', '+c.auto:'')+'. Da li ipak želiš da vratiš i ovaj termin?', go); return; }
   go();
 }
 /* stari klijent: nov termin, a isti klijent (ime ili telefon) postoji u Završenom → ponuda da se vrati njegov termin */
@@ -2207,17 +2207,19 @@ function onDatumChange(el){
 }
 
 /* ---------- PANEL ZA VREME (v9, umesto brojčanika): sat 0–23, pa minut → upiše, zatvori, fokus na Ime ---------- */
-let tpCloseFn = null, tpH = null, tpM = null, tpKb = false;
-function openTimePicker(){
-  if(!formDraft || document.getElementById('tpBackdrop')) return;
-  const m = /^(\d{1,2}):(\d{2})$/.exec(formDraft.vreme || '');
+let tpCloseFn = null, tpH = null, tpM = null, tpKb = false, tpOnPick = null;
+/* v18: onPick = panel van obrasca (Vrati iz Završenog); v0 = ponuđeno vreme */
+function openTimePicker(onPick, v0){
+  if(document.getElementById('tpBackdrop') || (!onPick && !formDraft)) return;
+  tpOnPick = onPick || null;
+  const m = /^(\d{1,2}):(\d{2})$/.exec((onPick ? v0 : formDraft.vreme) || '');
   tpH = m ? +m[1] : null; tpM = m ? m[2] : null; tpKb = false;
   const b = document.createElement('div');
   b.id = 'tpBackdrop'; b.className = 'tp-bg';
   b.addEventListener('click', e=>{ if(e.target === b) closeOverlay(tpCloseFn); });
   document.body.appendChild(b);
   renderTimePicker();
-  tpCloseFn = ()=>{ const x = document.getElementById('tpBackdrop'); if(x) x.remove(); tpCloseFn = null; };
+  tpCloseFn = ()=>{ const x = document.getElementById('tpBackdrop'); if(x) x.remove(); tpCloseFn = null; tpOnPick = null; };
   pushOverlay(tpCloseFn);
 }
 function renderTimePicker(){
@@ -2236,7 +2238,7 @@ function renderTimePicker(){
   }
   b.innerHTML = '<div class="tp"><div class="tp-head"><span class="t">U koliko sati?</span><button type="button" class="tp-kb" onclick="tpKbSet(true)" aria-label="Ukucaj tačno vreme">⌨️</button><span class="v">'+(tpH==null?'--':pad(tpH))+':'+(tpM||'--')+'</span></div>'+
     '<div class="tp-lab">1. Sat</div><div class="tp-grid">'+H+'</div>'+
-    '<div class="tp-lab" style="margin-top:12px">2. Minuti — dodir upiše vreme i otvori Ime</div><div class="tp-min">'+M+'</div>'+
+    '<div class="tp-lab" style="margin-top:12px">2. Minuti — dodir '+(tpOnPick ? 'vrati termin u zakazane' : 'upiše vreme i otvori Ime')+'</div><div class="tp-min">'+M+'</div>'+
     '<button type="button" class="tp-x" onclick="closeOverlay(tpCloseFn)">Otkaži</button></div>';
 }
 function tpPickH(h){ tpH = h; renderTimePicker(); }
@@ -2267,7 +2269,9 @@ function tpPickM(mm){
   tpSetTime(String(tpH).padStart(2,'0')+':'+mm);
 }
 function tpSetTime(val){
+  const onPick = tpOnPick;
   closeOverlay(tpCloseFn);
+  if(onPick){ onPick(val); return; }
   if(!formDraft) return;
   updateDraft('vreme', val);
   const f = document.getElementById('fVreme'); if(f){ f.textContent = val; f.classList.remove('empty'); }
@@ -2822,7 +2826,7 @@ function openHelpScreen(){
     { t:'Isto vreme', c:'Ako u isto vreme (isti dan i sat) već postoji termin, aplikacija pita da li ipak dodaješ. Takvi termini na spisku imaju oznaku "isto vreme", a u obrascu piše ko je već zakazan.' },
     { t:'Dodaj', c:'Dodir na Dodaj odmah otvara kalendar; posle datuma izađe panel "U koliko sati?" (sat, pa minuti :00/:15/:30/:45), a dodir na minut otvara tastaturu za ime. Za tačno vreme dodirni ⌨️ u panelu i ukucaj cifre (1035 = 10:35, 24 sata), pa Upiši. Dugme "Dodaj" gore otvara prazan obrazac za ručni unos: datum, vreme, ime i prezime (obavezno), auto, prečnik (ukucaš 16 → R16), iznos, napomena i telefon. Pored telefona: 📞 otvara Telefon (Nedavni → drži prst na broju → Kopiraj → nazad), 📋 upisuje kopirani broj. Strelica na tastaturi prelazi na sledeće polje; posle telefona stane na "Sačuvaj" (uokvireno), a dodir na njega čuva termin.' },
     { t:'Zakazano i Završeno', c:'Na početnom ekranu su zakazani termini po danima, unutar dana po vremenu; uz svaki dan piše broj termina i ukupan iznos. Povuci karticu udesno: pojavi se zeleno "Završeno", dodir na njega prebacuje termin u Završeno. Termin kome je prošao dan, a nije završen, ostaje gore sa crvenim naslovom "Prošlo". Kvadrat "Završeno" otvara završene termine (najnoviji gore); ponovni dodir ili korak nazad vraća zakazane.' },
-    { t:'Vraćanje iz Završenog', c:'U Završenom drži prst na kartici: uključi se označavanje (dodirom dodaješ ili skidaš kartice, "Označi sve" gore). Dole "Vrati u zakazane" ili "Obriši" (ide u korpu); ✕ ili korak nazad prekida. Može i prevlačenjem udesno: "Vrati". Termin sa starim datumom otvara kalendar: izabereš nov dan, vreme i ostali podaci ostaju (vreme menjaš dodirom na termin). Kad unosiš nov termin, a isti klijent (ime ili telefon) postoji u Završenom, aplikacija pita: "Vrati njega" upiše sve njegove podatke, "Novi klijent" pravi nov termin.' },
+    { t:'Vraćanje iz Završenog', c:'U Završenom drži prst na kartici: uključi se označavanje (dodirom dodaješ ili skidaš kartice, "Označi sve" gore). Dole "Vrati u zakazane" ili "Obriši" (ide u korpu); ✕ ili korak nazad prekida. Može i prevlačenjem udesno: "Vrati". Termin sa starim datumom otvara kalendar: izabereš nov dan, pa sat i minute; ostali podaci ostaju. Kad unosiš nov termin, a isti klijent (ime ili telefon) postoji u Završenom, aplikacija pita: "Vrati njega" upiše sve njegove podatke, "Novi klijent" pravi nov termin.' },
     { t:'Pretraga i prikaz', c:'"Pretraži" traži po imenu, autu, prečniku, napomeni, telefonu i iznosu, uvek i u zakazanim i u završenim (prvo zakazani), bez obzira na kvačice, velika slova i ćirilicu ili latinicu. Ikonica ▦/☰ menja prikaz između liste i mreže. Na kartici je ime, a ispod sitno auto, prečnik, napomena i telefon (dodir na broj zove); iznos je desno.' },
     { t:'Sortiranje', c:'"Sortiraj": "Datum i vreme" ređa termine po danu, pa po vremenu. "Ručno (ručke)" prikaže ručku (⠿) desno na svakoj kartici: drži je i prevuci karticu na novo mesto, u okviru istog dana. Ručni redosled se pamti.' },
     { t:'Izmena podataka', c:'Dodir na polje ga osenči: Backspace te vrati na prethodno polje bez brisanja, a prvo slovo ili mikrofon zameni stari tekst novim. Drugi dodir vraća tekst u polje za uređivanje dela teksta. Ako izađeš bez unosa, stari tekst ostaje. Taster za brisanje na označenom ili praznom polju ne briše, nego te vrati na prethodno polje.' },
