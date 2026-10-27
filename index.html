@@ -721,6 +721,7 @@ html .topbar .backup-reminder-row{ margin-bottom:6px; }
 .sw-done{ position:absolute; width:96px; box-sizing:border-box; border:none; z-index:0; background:#2E7D32; color:#fff; display:flex; flex-direction:column;
   align-items:center; justify-content:center; gap:4px; padding:0 12px 0 0; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; -webkit-tap-highlight-color:transparent; }
 .sw-done svg{ width:24px; height:24px; }
+.rd-date{ position:fixed; left:50%; bottom:40%; width:1px; height:1px; opacity:0; border:0; padding:0; pointer-events:none; }
 .group-header.grp-late{ background:#F2D3CC !important; color:#8A2E22 !important; }
 .sec-label{ font-size:12px; font-weight:800; letter-spacing:.4px; text-transform:uppercase; color:var(--text); padding:10px 2px 0; }
 .home-sq.sq-on .sq-box{ background:var(--green-deep); border-color:var(--green-deep); color:var(--on-accent); }
@@ -1100,7 +1101,7 @@ function backupReminderHtml(){
     (canShareBackup() ? '<button onclick="shareBackup()">podeli kopiju</button>' : '<button onclick="exportBackup()">izvezi bekap</button>')+
     '</div>';
 }
-function persistItems(){ const ok = persistChecked('zg:items', JSON.stringify(items)); if(ok) calAfterChange(); return ok; }
+function persistItems(quiet){ const ok = persistChecked('zg:items', JSON.stringify(items)); if(ok) calAfterChange(quiet); return ok; }
 function loadItems(){
   const saved = lsGet('zg:items');
   if(saved && saved.value){ try{ items = JSON.parse(saved.value); }catch(e){} }
@@ -1250,7 +1251,7 @@ function swClose(anim){
   o.tile.classList.toggle('sw-anim', anim !== false); o.tile.style.transform = '';
   setTimeout(()=>{ if(o.del) o.del.remove(); if(o.done) o.done.remove(); o.tile.classList.remove('sw-anim'); }, anim === false ? 0 : 220);
 }
-function swipeToDelete(tile, id, allowDone){
+function swipeToDelete(tile, id, allowDone, back){
   let x0 = 0, y0 = 0, on = false, dx = 0, track = false;
   const mkDel = ()=>{
     const d = document.createElement('button');
@@ -1267,11 +1268,12 @@ function swipeToDelete(tile, id, allowDone){
   const mkDone = ()=>{
     const d = document.createElement('button');
     d.type = 'button'; d.className = 'sw-done';
-    d.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"/></svg><span>Završeno</span>';
+    d.innerHTML = back ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg><span>Vrati</span>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 7"/></svg><span>Završeno</span>';
     d.style.top = tile.offsetTop + 'px'; d.style.height = tile.offsetHeight + 'px';
     d.style.left = tile.offsetLeft + 'px';
     const r = getComputedStyle(tile); d.style.borderRadius = r.borderTopLeftRadius + ' ' + r.borderTopLeftRadius + ' ' + r.borderBottomLeftRadius + ' ' + r.borderBottomLeftRadius;
-    d.onclick = (e)=>{ e.stopPropagation(); swClose(); markDone(id); };
+    d.onclick = (e)=>{ e.stopPropagation(); swClose(); if(back) reviveItems([id]); else markDone(id); };
     tile.parentNode.appendChild(d);
     return d;
   };
@@ -1357,7 +1359,7 @@ function quickReviveFromMenu(id){
 function markDone(id){
   const it = getItem(id); if(!it) return;
   it.zavrseno = new Date().toISOString();
-  if(!persistItems()){ it.zavrseno = null; render(); return; }
+  if(!persistItems(true)){ it.zavrseno = null; render(); return; }
   render();
   showNote('„'+(it.ime||'')+'“ je u Završenom.');
 }
@@ -1389,27 +1391,48 @@ function selDelete(){
   };
   __confirmOwn = true;
 }
-/* Vrati u zakazane: jedan termin sa prošlim datumom → obrazac sa njegovim podacima, bira se nov dan i vreme (stari klijent);
-   ostali se samo vrate (prošao datum = crveno u zakazanima) */
+/* Vrati u zakazane: jedan termin sa prošlim datumom → samo kalendar za nov dan (v18, Zoran 27.10.), vreme i podaci ostaju;
+   ostali se samo vrate (prošao datum = crveno u zakazanima). Bez Google prozora (quiet). */
 function reviveItems(ids, fromFn){
   const t = todayISO();
   const list = ids.map(getItem).filter(Boolean);
-  if(list.length===1 && list[0].datum < t){ openReviveForm(list[0].id, fromFn); return; }
+  if(list.length===1 && list[0].datum < t){ if(fromFn) closeOverlay(fromFn); openReviveDate(list[0].id); return; }
   list.forEach(it=>{ it.zavrseno = null; });
-  persistItems();
+  persistItems(true);
   if(fromFn) closeOverlay(fromFn); else render();
   const late = list.filter(it=>it.datum < t).length;
   render();
   showNote(list.length===1 ? 'Vraćeno u zakazane: '+apptShort(list[0]) : 'Vraćeno u zakazane: '+list.length+(late ? ' (sa starim datumom: '+late+' — crveno, promeni im datum)' : ''), { ms: late ? 8000 : 5000 });
 }
 let formRevive = false, formReturnAsked = false;
-function openReviveForm(id, fromFn){
-  openItemForm(id, fromFn);
-  formRevive = true;
-  formDraft.datum = ''; formDraft.vreme = '';
-  renderItemForm();
-  showNote('Izaberi nov dan i vreme za '+(formDraft.ime||'klijenta')+' — ostali podaci su već upisani.', { ms: 6000 });
-  openDatePicker();
+/* skriveno polje datuma u body (van #app — render ga ne dira); kalendar posle dva okvira (v16: Chrome odbaci datum na tek ubačenom polju) */
+let rdId = null;
+function openReviveDate(id){
+  rdId = id;
+  let el = document.getElementById('rdDate');
+  if(!el){
+    el = document.createElement('input'); el.type = 'date'; el.id = 'rdDate'; el.className = 'rd-date'; el.tabIndex = -1; el.setAttribute('aria-hidden','true');
+    el.addEventListener('change', ()=>{ const v = el.value; if(v && rdId) reviveOnDate(rdId, v); });
+    document.body.appendChild(el);
+  }
+  el.value = ''; el.min = todayISO();
+  void el.offsetWidth;
+  requestAnimationFrame(()=> requestAnimationFrame(()=>{ try{ el.showPicker(); }catch(e){ el.focus(); } }));
+}
+function reviveOnDate(id, datum){
+  const it = getItem(id); rdId = null;
+  const el = document.getElementById('rdDate'); if(el) el.value = '';
+  if(!it || !/^\d{4}-\d{2}-\d{2}$/.test(datum)) return;
+  const go = ()=>{
+    const old = { datum: it.datum, zavrseno: it.zavrseno };
+    it.datum = datum; it.zavrseno = null;
+    if(!persistItems(true)){ Object.assign(it, old); render(); return; }
+    render();
+    showNote('Vraćeno u zakazane: '+apptShort(it)+'. Vreme menjaš dodirom na termin.', { ms: 6000 });
+  };
+  const c = findClash(datum, it.vreme, id);
+  if(c){ showClashWarning('U '+it.vreme+' ('+dayLabel(datum)+') je već zakazan: '+(c.ime||'bez imena')+(c.auto?', '+c.auto:'')+'. Da li ipak želiš da vratiš i ovaj termin?', go); return; }
+  go();
 }
 /* stari klijent: nov termin, a isti klijent (ime ili telefon) postoji u Završenom → ponuda da se vrati njegov termin */
 let retCloseFn = null, __retRevive = null, __retNew = null, __retCancel = null;
@@ -1545,8 +1568,8 @@ function render(){
     '</div>'+
     '<div class="list-area">'+listHtml+'</div>'+bottom;
   _swOpen = null;
-  /* ulevo = Izbriši (svuda); udesno = Završeno (samo zakazani termin); bez prevlačenja dok se označava */
-  if(settings.viewMode!=='mreza' && !selMode) app.querySelectorAll('.day-grp > .med-card').forEach(c=>swipeToDelete(c, c.id.slice(5), !c.dataset.done));
+  /* ulevo = Izbriši (svuda); udesno = Završeno (zakazani) ili Vrati (završeni, v18); bez prevlačenja dok se označava */
+  if(settings.viewMode!=='mreza' && !selMode) app.querySelectorAll('.day-grp > .med-card').forEach(c=>swipeToDelete(c, c.id.slice(5), true, !!c.dataset.done));
   app.querySelectorAll('.drag-handle').forEach(h=>attachHandleDrag(h.parentNode, h));
 
   if(searchOpen){
@@ -1617,8 +1640,8 @@ function calOps(){
   if(!c.on) return ops;
   items.forEach(it=>{ if(!calWanted(it)) return; const m = c.map[it.id];
     if(!m) ops.push({ t:'add', id:it.id }); else if(m.h !== calHash(it, c)) ops.push({ t:'upd', id:it.id }); });
-  Object.keys(c.map).forEach(id=>{ const it = getItem(id);
-    if(!it || isDone(it)) ops.push({ t:'del', id }); });
+  /* v18 (Zoran 27.10.): Završeno ne dira kalendar (događaj ostaje); briše se samo obrisan termin */
+  Object.keys(c.map).forEach(id=>{ if(!getItem(id)) ops.push({ t:'del', id }); });
   return ops;
 }
 function calEvent(it, c){
@@ -1654,11 +1677,13 @@ function calAskTok(){
   try{ calClient.requestAccessToken(); }catch(e){ calWaitTok = false; logError('kalendar', e.message); calUi(); }
 }
 /* posle svake sačuvane izmene termina (persistItems) */
-function calAfterChange(){
+/* quiet (v18: Završeno, Vrati): bez Google prozora — šalje samo ako ključ već postoji, inače traka */
+function calAfterChange(quiet){
   const c = calCfg(); if(!c.on) return;
   calLoadGis();
-  if(!calOps().length) return;
+  if(!calOps().length){ setTimeout(calUi, 0); return; }
   if(calHasTok()){ calRun(); return; }
+  if(quiet){ setTimeout(calUi, 0); return; }
   const act = navigator.userActivation ? navigator.userActivation.isActive : false;
   if(act && calClient && !calWaitTok) setTimeout(calAskTok, 0); else setTimeout(calUi, 0);
 }
@@ -1707,7 +1732,7 @@ function calBodyHtml(){
   if(!c.on) return '<div class="field-hint" style="margin-bottom:16px;">Zakazani termini se sami upisuju u tvoj Google kalendar, menjaju i brišu kad ih ovde promeniš ili obrišeš. Kalendar ti šalje podsetnik na zaključan ekran.</div>'+
     '<div class="modal-actions"><button class="save-btn" onclick="calAskTok()">Poveži sa Google kalendarom</button></div>'+
     (calErr ? '<div class="field-hint" style="margin-top:12px; color:var(--coral); font-weight:700;">'+escapeHtml(calErr)+'</div>' : '');
-  return '<div class="field-hint" style="margin-bottom:12px;"><b>Povezano.</b> Budući zakazani termini su u Google kalendaru. Završeni i obrisani se brišu iz kalendara.'+
+  return '<div class="field-hint" style="margin-bottom:12px;"><b>Povezano.</b> Budući zakazani termini su u Google kalendaru. Obrisani se brišu iz kalendara; završeni tamo ostaju.'+
     (calWaitTok ? '<br>Čekam Google…' : calBusy ? '<br>Šaljem u kalendar…' : n ? '<br>Čeka slanje: '+n+'.' : '<br>Sve je poslato.')+'</div>'+
     (n && !calBusy ? '<div class="modal-actions" style="margin-bottom:14px;"><button class="save-btn" onclick="calSendNow()">Pošalji sada</button></div>' : '')+
     '<div class="field"><label>Podsetnik pre termina</label><div class="cal-min">'+
@@ -1731,7 +1756,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 17; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 18; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -2793,11 +2818,11 @@ function openHelpScreen(){
     { t:'Unos termina', c:'Dole u polje ukucaj ili izgovori termin (mikrofon na tastaturi), npr. "sutra u 10 Petar Petrović, Golf 7, R16, 4500, doneće svoje gume, telefon 064 123 45 67" (redosled kao na kartici; dok kucaš, podsetnik stoji u dnu polja), pa dugme za slanje ili Enter. Polje se raširi dok pišeš. AI sam rasporedi podatke i termin se odmah sačuva; gore piše šta je sačuvano, a nova kartica kratko zasija. AI razume danas, sutra, prekosutra, "u petak", "u pola 11" (10:30).' },
     { t:'Ispravka', c:'Dodir na karticu odmah otvara izmenu (prozor odozdo); gore uz ime je "Obriši" (termin ide u korpu). Polja koja nisu uneta imaju crven naziv. Dug pritisak (drži prst) na kartici otvara brzi meni: Izmeni ili Obriši.' },
     { t:'Kad nešto nedostaje', c:'Datum, vreme i ime su obavezni. Ako AI ne prepozna neko od njih, otvori se izmena sa onim što je razumeo; šta nije uneto ima crven naziv, a obavezna polja i crven okvir. Termin se čuva tek kad dopuniš obavezno.' },
-    { t:'Google kalendar', c:'Podešavanja → Google kalendar → Poveži (prvi put izabereš nalog i dozvoliš). Posle toga se budući zakazani termini sami upisuju u Google kalendar, a izmena ili brisanje ovde menja i kalendar; završeni i obrisani nestaju iz kalendara. Kalendar šalje podsetnik na zaključan ekran (15 min, 30 min, 1 h ili 2 h pre, biraš u Podešavanjima). Google ponekad ponovo traži potvrdu: posle čuvanja na trenutak iskoči Google-ov prozor, ili gore piše "Kalendar čeka" pa dodirneš Pošalji.' },
+    { t:'Google kalendar', c:'Podešavanja → Google kalendar → Poveži (prvi put izabereš nalog i dozvoliš). Posle toga se budući zakazani termini sami upisuju u Google kalendar, a izmena ili brisanje ovde menja i kalendar; obrisani nestaju iz kalendara, a završeni tamo ostaju. Završavanje i vraćanje iz Završenog ne otvaraju Google-ov prozor. Kalendar šalje podsetnik na zaključan ekran (15 min, 30 min, 1 h ili 2 h pre, biraš u Podešavanjima). Google ponekad ponovo traži potvrdu: posle čuvanja na trenutak iskoči Google-ov prozor, ili gore piše "Kalendar čeka" pa dodirneš Pošalji.' },
     { t:'Isto vreme', c:'Ako u isto vreme (isti dan i sat) već postoji termin, aplikacija pita da li ipak dodaješ. Takvi termini na spisku imaju oznaku "isto vreme", a u obrascu piše ko je već zakazan.' },
     { t:'Dodaj', c:'Dodir na Dodaj odmah otvara kalendar; posle datuma izađe panel "U koliko sati?" (sat, pa minuti :00/:15/:30/:45), a dodir na minut otvara tastaturu za ime. Za tačno vreme dodirni ⌨️ u panelu i ukucaj cifre (1035 = 10:35, 24 sata), pa Upiši. Dugme "Dodaj" gore otvara prazan obrazac za ručni unos: datum, vreme, ime i prezime (obavezno), auto, prečnik (ukucaš 16 → R16), iznos, napomena i telefon. Pored telefona: 📞 otvara Telefon (Nedavni → drži prst na broju → Kopiraj → nazad), 📋 upisuje kopirani broj. Strelica na tastaturi prelazi na sledeće polje; posle telefona stane na "Sačuvaj" (uokvireno), a dodir na njega čuva termin.' },
     { t:'Zakazano i Završeno', c:'Na početnom ekranu su zakazani termini po danima, unutar dana po vremenu; uz svaki dan piše broj termina i ukupan iznos. Povuci karticu udesno: pojavi se zeleno "Završeno", dodir na njega prebacuje termin u Završeno. Termin kome je prošao dan, a nije završen, ostaje gore sa crvenim naslovom "Prošlo". Kvadrat "Završeno" otvara završene termine (najnoviji gore); ponovni dodir ili korak nazad vraća zakazane.' },
-    { t:'Vraćanje iz Završenog', c:'U Završenom drži prst na kartici: uključi se označavanje (dodirom dodaješ ili skidaš kartice, "Označi sve" gore). Dole "Vrati u zakazane" ili "Obriši" (ide u korpu); ✕ ili korak nazad prekida. Jedan termin sa starim datumom otvara se sa svim podacima, a ti izabereš nov dan i vreme. Kad unosiš nov termin, a isti klijent (ime ili telefon) postoji u Završenom, aplikacija pita: "Vrati njega" upiše sve njegove podatke, "Novi klijent" pravi nov termin.' },
+    { t:'Vraćanje iz Završenog', c:'U Završenom drži prst na kartici: uključi se označavanje (dodirom dodaješ ili skidaš kartice, "Označi sve" gore). Dole "Vrati u zakazane" ili "Obriši" (ide u korpu); ✕ ili korak nazad prekida. Može i prevlačenjem udesno: "Vrati". Termin sa starim datumom otvara kalendar: izabereš nov dan, vreme i ostali podaci ostaju (vreme menjaš dodirom na termin). Kad unosiš nov termin, a isti klijent (ime ili telefon) postoji u Završenom, aplikacija pita: "Vrati njega" upiše sve njegove podatke, "Novi klijent" pravi nov termin.' },
     { t:'Pretraga i prikaz', c:'"Pretraži" traži po imenu, autu, prečniku, napomeni, telefonu i iznosu, uvek i u zakazanim i u završenim (prvo zakazani), bez obzira na kvačice, velika slova i ćirilicu ili latinicu. Ikonica ▦/☰ menja prikaz između liste i mreže. Na kartici je ime, a ispod sitno auto, prečnik, napomena i telefon (dodir na broj zove); iznos je desno.' },
     { t:'Sortiranje', c:'"Sortiraj": "Datum i vreme" ređa termine po danu, pa po vremenu. "Ručno (ručke)" prikaže ručku (⠿) desno na svakoj kartici: drži je i prevuci karticu na novo mesto, u okviru istog dana. Ručni redosled se pamti.' },
     { t:'Izmena podataka', c:'Dodir na polje ga osenči: Backspace te vrati na prethodno polje bez brisanja, a prvo slovo ili mikrofon zameni stari tekst novim. Drugi dodir vraća tekst u polje za uređivanje dela teksta. Ako izađeš bez unosa, stari tekst ostaje. Taster za brisanje na označenom ili praznom polju ne briše, nego te vrati na prethodno polje.' },
