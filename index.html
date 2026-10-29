@@ -1637,6 +1637,8 @@ const CAL_MINS = [15, 30, 60, 120];
 let calTok = null, calTokTo = 0, calClient = null, calGisP = null, calBusy = false, calWaitTok = false, calErr = '';
 function calCfg(){ const v = lsGet('zg:cal'); let c = null; try{ c = v && v.value ? JSON.parse(v.value) : null; }catch(e){} c = c || {}; if(!c.map) c.map = {}; if(!CAL_MINS.includes(c.min)) c.min = 30; return c; }
 function calSave(c){ return persistChecked('zg:cal', JSON.stringify(c)); }
+/* v20: nalog kalendara iz odgovora Google-a (organizer/creator primarnog kalendara) — za login_hint */
+function calEmailOf(ev){ const o = (ev && ev.organizer && ev.organizer.email) || (ev && ev.creator && ev.creator.email) || ''; return /^[^@\s]+@[^@\s]+$/.test(o) && !/calendar\.google\.com$/.test(o) ? o : ''; }
 function calHasTok(){ return !!calTok && Date.now() < calTokTo - 60000; }
 function calStart(it){ const d = new Date(it.datum+'T'+(it.vreme||'00:00')+':00'); return isNaN(d) ? null : d; }
 function calWanted(it){ if(!it || isDone(it) || !it.datum || !it.vreme) return false; const d = calStart(it); return !!d && d.getTime() > Date.now(); }
@@ -1680,7 +1682,9 @@ function calLoadGis(){
 function calAskTok(){
   if(!calClient){ calLoadGis(); showNote('Google se još učitava — dodirni ponovo za sekund.'); return; }
   calWaitTok = true; calUi();
-  try{ calClient.requestAccessToken(); }catch(e){ calWaitTok = false; logError('kalendar', e.message); calUi(); }
+  /* v20 (Zoran 29.10.): poznat nalog → Google preskače izbor naloga (login_hint, zvanična GIS dokumentacija) */
+  const hint = calCfg().hint;
+  try{ calClient.requestAccessToken(hint ? { login_hint: hint } : undefined); }catch(e){ calWaitTok = false; logError('kalendar', e.message); calUi(); }
 }
 /* posle svake sačuvane izmene termina (persistItems) */
 /* quiet (v18: Završeno, Vrati): bez Google prozora — šalje samo ako ključ već postoji, inače traka */
@@ -1717,7 +1721,7 @@ async function calRun(){
           r = await calApi('PATCH', CAL_API+'/'+encodeURIComponent(m.e), ev);
           if(r.st === 404 || r.st === 410) r = await calApi('POST', CAL_API, ev);
         } else r = await calApi('POST', CAL_API, ev);
-        if(r.st === 200 && r.j && r.j.id){ const c2 = calCfg(); const it2 = getItem(op.id); if(it2) c2.map[op.id] = { e: r.j.id, h: calHash(it2, c2) }; calSave(c2); done++; continue; }
+        if(r.st === 200 && r.j && r.j.id){ const c2 = calCfg(); const it2 = getItem(op.id); if(it2) c2.map[op.id] = { e: r.j.id, h: calHash(it2, c2) }; const em = calEmailOf(r.j); if(em) c2.hint = em; calSave(c2); done++; continue; }
       }
       if(r.st === 401){ calTok = null; calErr = ''; break; }
       calErr = 'Kalendar je odbio izmenu (greška '+r.st+').'; logError('kalendar', op.t+' HTTP '+r.st+' '+JSON.stringify(r.j||'').slice(0,300)); break;
@@ -1750,7 +1754,7 @@ function calBodyHtml(){
 function calSetMin(m){ const c = calCfg(); c.min = m; calSave(c); calUi(); showNote('Podsetnik: '+(m<60 ? m+' min' : (m/60)+' h')+' pre termina.'); calAfterChange(); }
 function calOff(){
   showConfirm('Prekinuti vezu sa Google kalendarom? Termini koji su već tamo ostaju.', ()=>{
-    const c = calCfg(); c.on = false; calSave(c);
+    const c = calCfg(); c.on = false; delete c.hint; calSave(c);
     try{ if(calTok && window.google) google.accounts.oauth2.revoke(calTok, ()=>{}); }catch(e){}
     calTok = null; calErr = ''; calUi(); showNote('Veza sa kalendarom je prekinuta.');
   }, 'Da, prekini');
@@ -1762,7 +1766,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 19; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 20; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
