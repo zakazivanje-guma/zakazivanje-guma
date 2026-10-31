@@ -207,6 +207,9 @@
   .modal-actions{ display:flex; gap:10px; margin-top:6px; }
   .modal-actions button{ flex:1; padding:13px; border-radius:13px; border:none; font-size:14.5px; font-weight:700; cursor:pointer; }
   .cancel-btn{ background:var(--bg-elevated); color:var(--text); }
+  .chg-list{ display:flex; flex-direction:column; gap:8px; margin:0 0 16px; }
+  .chg-opt{ display:flex; flex-direction:column; align-items:flex-start; gap:3px; text-align:left; padding:12px 14px; border-radius:14px; border:1px solid var(--line); background:var(--bg-elevated); color:var(--text); font:inherit; font-size:15px; cursor:pointer; }
+  .chg-opt span{ font-size:13px; color:var(--text-dim); }
   .save-btn{ background:linear-gradient(150deg, var(--green), var(--green-deep)); color:var(--on-accent); }
   /* v53: broj dana sa „Sačuvaj“ pored polja (kao prevodilac v99); boje dugmeta iz .save-btn svake teme */
   .save-row{ display:flex; gap:8px; align-items:stretch; }
@@ -1766,7 +1769,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 20; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 21; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -1894,6 +1897,7 @@ async function handleIncomingText(text){
     return;
   }
   isProcessing = false;
+  if(r.radnja==='izmena'){ render(); handleVoiceChange(r, text); return; }
   const miss = missingOf(r);
   if(miss.length){
     render();
@@ -1911,6 +1915,77 @@ async function handleIncomingText(text){
     return;
   }
   saveRecognizedChecked(r);
+}
+/* v21 (Zoran 31.10.): izmena postojećeg termina glasom — izdiktira se samo šta se menja, termin se odmah menja
+   (kao nov unos); gore piše šta je bilo → šta je sada. Više mogućih termina → kratak izbor; nijedan → tekst ostaje u polju. */
+function bookingListHint(){
+  const t = addDaysISO(todayISO(), -7);
+  const list = items.filter(x=>!isDone(x) && x.datum >= t).sort((a,b)=> (a.datum+a.vreme).localeCompare(b.datum+b.vreme)).slice(0, 80);
+  if(!list.length) return 'nema';
+  return list.map(x=>[x.id, DANI[dateOf(x.datum).getDay()]+' '+x.datum, x.vreme||'-', x.ime||'-', x.auto||'-', x.dimenzije||'-', x.telefon||'-'].join('; ')).join(' | ');
+}
+function changeOf(it, r){
+  const ch = {};
+  if(r.datum && r.datum!==it.datum) ch.datum = r.datum;
+  if(r.vreme && r.vreme!==it.vreme) ch.vreme = r.vreme;
+  if(r.ime && nameKey(r.ime)!==nameKey(it.ime) && foldAll(it.ime).indexOf(foldAll(r.ime))===-1) ch.ime = r.ime;
+  ['auto','dimenzije','napomena','telefon'].forEach(k=>{ if(r[k] && foldAll(r[k])!==foldAll(it[k])) ch[k] = r[k]; });
+  if(r.iznos!=null && r.iznos!=='' && Number(r.iznos)!==Number(it.iznos)) ch.iznos = r.iznos;
+  return ch;
+}
+/* kratko ime dana za poruku: danas / sutra / prekosutra / ime dana (narednih 7 dana) / 4.11. */
+function shortDay(iso){
+  const t = todayISO();
+  if(iso===t) return 'danas'; if(iso===addDaysISO(t,1)) return 'sutra'; if(iso===addDaysISO(t,2)) return 'prekosutra';
+  if(iso > t && iso <= addDaysISO(t,6)) return DANI[dateOf(iso).getDay()];
+  const d = dateOf(iso); return d.getDate()+'.'+(d.getMonth()+1)+'.';
+}
+function handleVoiceChange(r, text){
+  const cands = r.termini.map(getItem).filter(x=>x && !isDone(x)).filter((x,i,a)=>a.indexOf(x)===i);
+  if(!cands.length){ restoreManualInput(text); refocusInput(); showBanner('Nisam našao termin koji treba promeniti. Tekst je vraćen u polje.'); return; }
+  if(cands.length===1) return applyVoiceChange(cands[0].id, r, text);
+  showChangePick(cands, (id)=>applyVoiceChange(id, r, text), ()=>{ restoreManualInput(text); });
+}
+function applyVoiceChange(id, r, text){
+  const it = getItem(id); if(!it) return;
+  const ch = changeOf(it, r);
+  if(!Object.keys(ch).length){ restoreManualInput(text); refocusInput(); showBanner('Nije jasno šta da se promeni kod: '+apptShort(it)+'. Tekst je vraćen u polje.'); return; }
+  const nd = ch.datum || it.datum, nv = ch.vreme || it.vreme;
+  const go = ()=>{
+    const old = Object.assign({}, it);
+    Object.assign(it, ch);
+    if(!persistItems()){ Object.keys(ch).forEach(k=>{ it[k] = old[k]; }); render(); return; }
+    render(); refocusInput(); scrollAndHighlightItem(id);
+    /* gornja poruka ima 2 reda: kratko — dan/vreme staro → novo; ostala polja samo novo (jedno polje: staro → novo) */
+    const parts = [], keys = ['ime','auto','dimenzije','napomena','telefon','iznos'].filter(k=>k in ch);
+    const val = (k, v)=> k==='iznos' ? (fmtIznos(v)||'—') : (v||'—');
+    if(ch.datum || ch.vreme) parts.push((it.datum===old.datum ? '' : shortDay(old.datum)+' ')+old.vreme+' → '+(it.datum===old.datum ? '' : shortDay(it.datum)+' ')+it.vreme);
+    keys.forEach(k=>{ parts.push(!parts.length && keys.length===1 ? val(k, old[k]).replace(/ din$/,'')+' → '+val(k, ch[k]) : val(k, ch[k])); });
+    showNote((old.ime||'bez imena')+': '+parts.join(', ')+(r.nesigurno ? '. Proveri: '+r.nesigurno : ''), { ms: 8000 });
+  };
+  const c = (ch.datum || ch.vreme) ? findClash(nd, nv, id) : null;
+  if(c) showClashWarning('U '+nv+' ('+dayLabel(nd)+') je već zakazan: '+(c.ime||'bez imena')+(c.auto?', '+c.auto:'')+'. Pomeriti ipak, ili je ovo greška?', go, 'Ipak pomeri');
+  else go();
+}
+let chgCloseFn = null, __chgPick = null, __chgCancel = null;
+function showChangePick(cands, onPick, onCancel){
+  __chgPick = onPick; __chgCancel = onCancel || null;
+  const b = document.createElement('div'); b.className='modal-backdrop'; b.id='chgBackdrop';
+  b.innerHTML = '<div class="modal" style="border-radius:22px;">'+
+    '<h2 class="serif">Koji termin menjaš?</h2>'+
+    '<div class="chg-list">'+cands.map(x=>'<button class="chg-opt" onclick="runChg(\''+x.id+'\')"><b>'+escapeHtml(x.ime||'bez imena')+'</b><span>'+
+      escapeHtml(dayLabel(x.datum)+' u '+x.vreme+[x.auto, x.dimenzije].filter(Boolean).map(v=>' · '+v).join(''))+'</span></button>').join('')+'</div>'+
+    '<div class="modal-actions"><button class="cancel-btn" onclick="closeOverlay(chgCloseFn)">Otkaži</button></div></div>';
+  document.body.appendChild(b);
+  b.addEventListener('click',(e)=>{ if(e.target===b) closeOverlay(chgCloseFn); });
+  chgCloseFn = ()=>{ const bb=document.getElementById('chgBackdrop'); if(bb) bb.remove(); const c=__chgCancel; __chgPick=__chgCancel=null; chgCloseFn=null; if(c) c(); };
+  pushOverlay(chgCloseFn);
+}
+function runChg(id){
+  const pick = __chgPick; __chgCancel = null; if(!chgCloseFn) return;
+  const fn = ()=>{ if(pick) pick(id); };
+  afterBackQ.push(fn); closeOverlay(chgCloseFn);
+  setTimeout(()=>{ const i = afterBackQ.indexOf(fn); if(i!==-1){ afterBackQ.splice(i,1); fn(); } }, 400);
 }
 function saveRecognizedChecked(r){
   const c = findClash(r.datum, r.vreme, null);
@@ -2136,8 +2211,13 @@ async function geminiStructuredRequest(sys, parts, schema, maxOutputTokens, time
 }
 
 async function callGeminiForBooking(rawText){
-  const sys = 'Pomoćnik u vulkanizerskoj radnji „Tire Time“ (Srbija). Korisnik je izgovorio ili ukucao zakazivanje zamene guma (glasovni ili tekstualni unos). Tekst: "'+rawText+'". '+
+  const sys = 'Pomoćnik u vulkanizerskoj radnji „Tire Time“ (Srbija). Korisnik je izgovorio ili ukucao nov termin za zamenu guma ILI izmenu postojećeg termina (glasovni ili tekstualni unos). Tekst: "'+rawText+'". '+
     'Razloži tu rečenicu na polja termina. Kalendar od danas: '+calendarHint()+'. '+
+    'RADNJA: „izmena“ SAMO kad rečenica kaže da se postojeći termin menja (pomeri, prebaci, promeni, odloži, ispravi, ranije, kasnije, umesto, „ne u 10 nego u 11“, „dolazi u 11 a ne u 10“); inače „novi“ (i kad klijent već ima termin). '+
+    'Za „izmena“: TERMINI = id-jevi termina iz spiska zakazanih na koje se rečenica odnosi (po imenu, autu, danu, vremenu ili telefonu; jedan kad je jasno, više kad se ne može razlikovati koji, prazno kad nijedan ne odgovara); '+
+    'u polja upiši SAMO nove vrednosti koje treba upisati, a sve po čemu si prepoznao termin i sve što se ne menja ostavi prazno (npr. „Petra pomeri na 12“ → vreme 12:00, datum prazan, ime prazno). '+
+    '„sat kasnije“, „pola sata ranije“, „dan kasnije“ računaj od vremena i dana tog termina iz spiska. Za „novi“: TERMINI prazno. '+
+    'Zakazani termini (id; dan; vreme; ime; auto; prečnik; telefon): '+bookingListHint()+'. '+
     'DATUM (GGGG-MM-DD): „danas“, „sutra“, „prekosutra“ iz kalendara; „u petak“, „ovaj petak“, „sledeći petak“ = PRVI petak POSLE danas (ako je danas petak, to je za 7 dana); '+
     '„sledeće nedelje u petak“ = petak u sledećoj kalendarskoj nedelji (ponedeljak–nedelja); „25.“ ili „25. oktobra“ = taj dan, najbliži koji nije prošao; ako datum nije rečen, prazan string. '+
     'VREME (HH:MM, 24 sata): „u 10“ = 10:00; „u pola 11“ = 10:30 (srpski: pola jedanaest je 10:30); „u 10 i 15“ = 10:15; „u petnaest do 11“ = 10:45; „u 3 popodne“ = 15:00; „uveče“ dodaje 12 sati kad je broj manji od 12. '+
@@ -2152,8 +2232,9 @@ async function callGeminiForBooking(rawText){
   const schema = { type:'object', properties:{
     datum:{ type:'string', description:'GGGG-MM-DD ili prazno' }, vreme:{ type:'string', description:'HH:MM ili prazno' },
     ime:{ type:'string' }, auto:{ type:'string' }, dimenzije:{ type:'string' }, iznos:{ type:'string', description:'ceo broj u dinarima, samo cifre, ili prazno' },
-    napomena:{ type:'string' }, telefon:{ type:'string' }, nesigurno:{ type:'string' } },
-    required:['datum','vreme','ime','auto','dimenzije','iznos','napomena','telefon','nesigurno'] };
+    napomena:{ type:'string' }, telefon:{ type:'string' }, nesigurno:{ type:'string' },
+    radnja:{ type:'string', enum:['novi','izmena'] }, termini:{ type:'array', items:{ type:'string' }, description:'id-jevi termina za izmenu' } },
+    required:['radnja','termini','datum','vreme','ime','auto','dimenzije','iznos','napomena','telefon','nesigurno'] };
   const r = await geminiStructuredRequest(sys, [{ text: rawText }], schema, 1500, 30000);
   return {
     datum: normDatum(r.datum),
@@ -2164,7 +2245,9 @@ async function callGeminiForBooking(rawText){
     iznos: normIznos(r.iznos),
     napomena: String(r.napomena||'').trim(),
     telefon: normTel(r.telefon),
-    nesigurno: String(r.nesigurno||'').trim()
+    nesigurno: String(r.nesigurno||'').trim(),
+    radnja: r.radnja==='izmena' ? 'izmena' : 'novi',
+    termini: Array.isArray(r.termini) ? r.termini.map(x=>String(x||'').trim()).filter(Boolean) : []
   };
 }
 
@@ -2830,6 +2913,7 @@ function openHelpScreen(){
   const b = document.createElement('div'); b.className='modal-backdrop top'; b.id='helpBackdrop';
   const sections = [
     { t:'Unos termina', c:'Dole u polje ukucaj ili izgovori termin (mikrofon na tastaturi), npr. "sutra u 10 Petar Petrović, Golf 7, R16, 4500, doneće svoje gume, telefon 064 123 45 67" (redosled kao na kartici; dok kucaš, podsetnik stoji u dnu polja), pa dugme za slanje ili Enter. Polje se raširi dok pišeš. AI sam rasporedi podatke i termin se odmah sačuva; gore piše šta je sačuvano, a nova kartica kratko zasija. AI razume danas, sutra, prekosutra, "u petak", "u pola 11" (10:30).' },
+    { t:'Izmena glasom', c:'Isto polje menja postojeći termin kad kažeš šta se menja: \"Petra Petrovića pomeri na 12\", \"Golf 7 prebaci sa sutra na četvrtak u 9\", \"Marko dolazi u 11 umesto u 10\", \"Petru promeni cenu na 5000\". Menja se samo rečeno, termin se odmah čuva (i u Google kalendaru), a gore piše šta je bilo i šta je sada. Ako odgovara više termina, izabereš koji; ako nijedan, tekst ostaje u polju.' },
     { t:'Ispravka', c:'Dodir na karticu odmah otvara izmenu (prozor odozdo); gore uz ime je "Obriši" (termin ide u korpu). Polja koja nisu uneta imaju crven naziv. Dug pritisak (drži prst) na kartici otvara brzi meni: Izmeni ili Obriši.' },
     { t:'Kad nešto nedostaje', c:'Datum, vreme i ime su obavezni. Ako AI ne prepozna neko od njih, otvori se izmena sa onim što je razumeo; šta nije uneto ima crven naziv, a obavezna polja i crven okvir. Termin se čuva tek kad dopuniš obavezno.' },
     { t:'Google kalendar', c:'Podešavanja → Google kalendar → Poveži (prvi put izabereš nalog i dozvoliš). Posle toga se budući zakazani termini sami upisuju u Google kalendar, a izmena ili brisanje ovde menja i kalendar; obrisani nestaju iz kalendara, a završeni tamo ostaju. Završavanje i vraćanje iz Završenog ne otvaraju Google-ov prozor. Kalendar šalje podsetnik na zaključan ekran (15 min, 30 min, 1 h ili 2 h pre, biraš u Podešavanjima). Google ponekad ponovo traži potvrdu: posle čuvanja na trenutak iskoči Google-ov prozor, ili gore piše "Kalendar čeka" pa dodirneš Pošalji.' },
@@ -2926,14 +3010,14 @@ function showExitConfirm(){
 /* ---------- UPOZORENJE: ISTO VREME (Apotekin prozor za duplikat) ---------- */
 let __dupYes = null;
 let dupCloseFn = null;
-function showClashWarning(msg, onYes){
+function showClashWarning(msg, onYes, yesLabel){
   __dupYes = onYes;
   const b = document.createElement('div'); b.className='modal-backdrop'; b.id='dupBackdrop';
   b.innerHTML = '<div class="modal" style="border-radius:22px;">'+
     '<h2 class="serif">Isto vreme</h2>'+
     '<p style="font-size:14.5px; color:var(--text); line-height:1.5; margin:0 0 20px;">'+escapeHtml(msg)+'</p>'+
     '<div class="modal-actions"><button class="cancel-btn" onclick="closeDuplicateWarning()">Otkaži</button>'+
-    '<button class="save-btn" onclick="runDupYes()">Ipak dodaj</button></div></div>';
+    '<button class="save-btn" onclick="runDupYes()">'+(yesLabel||'Ipak dodaj')+'</button></div></div>';
   document.body.appendChild(b);
   b.addEventListener('click',(e)=>{ if(e.target===b) closeDuplicateWarning(); });
   dupCloseFn = ()=>{ const bb=document.getElementById('dupBackdrop'); if(bb) bb.remove(); __dupYes=null; dupCloseFn=null; };
