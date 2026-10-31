@@ -207,7 +207,7 @@
   .modal-actions{ display:flex; gap:10px; margin-top:6px; }
   .modal-actions button{ flex:1; padding:13px; border-radius:13px; border:none; font-size:14.5px; font-weight:700; cursor:pointer; }
   .cancel-btn{ background:var(--bg-elevated); color:var(--text); }
-  .sum-strip{ display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; box-sizing:border-box; margin:0 0 12px; padding:11px 14px; border-radius:14px; border:1px solid var(--line); background:var(--bg-elevated); color:var(--text); font:inherit; text-align:left; cursor:pointer; }
+  .sum-strip{ display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; box-sizing:border-box; margin:10px 0 2px; padding:10px 14px; border-radius:14px; border:1px solid var(--line); background:var(--bg-elevated); color:var(--text); font:inherit; text-align:left; cursor:pointer; }
   .sum-strip .ss-l{ display:flex; flex-direction:column; gap:2px; min-width:0; }
   .sum-strip .ss-l b{ font-size:15px; } .sum-strip .ss-l span{ font-size:12.5px; color:var(--text-dim); }
   .sum-strip .ss-r{ font-size:18px; white-space:nowrap; }
@@ -1610,9 +1610,9 @@ function render(){
     '</div>'+
     (searchOpen && !selMode
       ? '<div class="search-wrap home-search"><span class="sicon">'+ic('🔍','search')+'</span><input id="searchInput" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Pretraži ime, auto, telefon, napomenu..." value="'+escapeHtml(searchQuery)+'" oninput="setSearch(this.value)" autofocus><button class="search-x" onclick="toggleSearch()" aria-label="Zatvori pretragu">✕</button></div>'
-      : sqRow)+
+      : sqRow)+sumStrip+   /* v24 (Zoran 31.10.): zbir u zaglavlju — ostaje gore pri pomeranju spiska */
     '</div>'+
-    '<div class="list-area">'+sumStrip+listHtml+'</div>'+bottom;
+    '<div class="list-area">'+listHtml+'</div>'+bottom;
   _swOpen = null;
   /* ulevo = Izbriši (svuda); udesno = Završeno (zakazani) ili Vrati (završeni, v18); bez prevlačenja dok se označava */
   if(settings.viewMode!=='mreza' && !selMode) app.querySelectorAll('.day-grp > .med-card').forEach(c=>swipeToDelete(c, c.id.slice(5), true, !!c.dataset.done));
@@ -1806,7 +1806,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 23; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 24; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
