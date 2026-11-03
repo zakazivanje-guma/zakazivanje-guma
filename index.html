@@ -652,6 +652,10 @@ input::selection, textarea::selection{ background:color-mix(in srgb, var(--frame
 .hist-row .hs-sub{ display:block; font-size:13px; color:var(--text-dim); margin-top:2px; font-weight:400; }
 .hist-row .hist-go{ font-size:24px; color:var(--text-dim); flex:none; }
 .hist-this{ font-size:12px; font-weight:700; padding:1px 7px; border-radius:9px; background:var(--green-pale); color:var(--text); }
+.form-full.is-rec .ff-head{ background:var(--green-pale); }
+.rec-band{ flex:none; display:flex; align-items:center; gap:8px; padding:9px 18px; background:var(--green-pale); border-bottom:1px solid var(--line); font-size:14.5px; font-weight:700; color:var(--text); }
+.rec-band .rb-ic{ flex:none; width:22px; height:22px; border-radius:50%; background:var(--green-deep); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; }
+.form-full .ff-head .ff-backbtn{ flex:none; width:36px; height:36px; border-radius:50%; border:none; background:var(--bg-elevated); color:var(--text); display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; }
 .hist-sum{ font-size:15px; color:var(--text); padding:0 4px 8px; }
 /* iznos (v25): veće polje i krupan broj */
 .form-full #fIznos{ font-size:24px; font-weight:700; padding:14px; }
@@ -1838,7 +1842,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 27; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 28; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -2598,10 +2602,14 @@ function renderItemForm(){
   const oldBody = b.querySelector('.ff-body'); const keepScroll = oldBody ? oldBody.scrollTop : 0;
   const L = (k, txt, req)=> '<label>'+txt+(req?' *':'')+'<span class="miss-tx"></span></label>';
   const orig = formEditId ? getItem(formEditId) : null;
-  b.innerHTML = '<div class="modal form-full">'+
-    '<div class="ff-head"><h2 class="serif">'+escapeHtml(orig ? (orig.ime||'Bez imena') : 'Novi termin')+'</h2>'+
+  /* v28 (Zoran 3.11.): završena zamena se jasno razlikuje — zeleno zaglavlje i traka; otvorena iz istorije: ‹ nazad na termin */
+  const isRec = !!(orig && isHistRec(orig)), fromHist = histStack.length > 0;
+  b.innerHTML = '<div class="modal form-full'+(isRec?' is-rec':'')+'">'+
+    '<div class="ff-head">'+(fromHist ? '<button class="ff-backbtn" onclick="closeItemForm()" aria-label="Nazad na termin">'+HOME_IC.back+'</button>' : '')+
+    '<h2 class="serif">'+escapeHtml(orig ? (orig.ime||'Bez imena') : 'Novi termin')+'</h2>'+
     (orig ? '<button class="ff-del" onclick="deleteFromForm()">Obriši</button>' : '')+
-    '<button class="modal-close-x" onclick="closeItemForm()" aria-label="Zatvori">✕</button></div>'+
+    (fromHist ? '' : '<button class="modal-close-x" onclick="closeItemForm()" aria-label="Zatvori">✕</button>')+'</div>'+
+    (isRec ? '<div class="rec-band"><span class="rb-ic">✓</span>'+(fromHist ? 'Iz istorije · zamena ' : 'Završena zamena · ')+escapeHtml(dmyShort(orig.datum))+'</div>' : '')+
     '<div class="ff-body">'+
     analyzingHtml+'<div id="formHist">'+formHistHtml()+'</div><div id="formWarn">'+formWarningsHtml()+'</div>'+
     '<div class="zg-row2">'+
@@ -2640,6 +2648,7 @@ function renderItemForm(){
 function formIsRec(){ const it = formEditId && getItem(formEditId); return !!(it && isHistRec(it)); }
 function formHistList(){ return formDraft ? clientHistory(formDraft.ime, formDraft.telefon, formIsRec() ? null : formEditId, '') : []; }
 function formHistHtml(){
+  if(histStack.length) return '';   /* v28: iz istorije se ne ulazi dublje */
   const l = formHistList(); if(!l.length) return '';
   const x = l[0];
   return '<button type="button" class="hist-row" onclick="openClientHistory()"><span><b>'+(formIsRec() ? 'Istorija' : 'Ranije')+': '+l.length+' '+zamenaRec(l.length)+'</b>'+
