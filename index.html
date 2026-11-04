@@ -691,6 +691,13 @@ body:not(.mi-rest) .entry-row-input:focus-within textarea::placeholder{ color:tr
 /* donja traka za unos kao u Troškovima (Apoteka ima stilove trake za sve teme) */
 #app{ padding-bottom:calc(190px + env(safe-area-inset-bottom,0px)); }
 .bottom-bar{ z-index:20; }
+/* v30: strelica na vrh (uzor Arhiva v261/v262) — posle trećine ekrana skrolovanja, iznad donje trake; dodir glatko na vrh */
+.to-top{ position:fixed; left:50%; bottom:calc(18px + env(safe-area-inset-bottom)); z-index:21; width:48px; height:48px; margin:0 0 0 -24px; padding:0;
+  border-radius:50%; display:flex; align-items:center; justify-content:center; border:1px solid var(--line); background:color-mix(in srgb, var(--surface) 94%, transparent);
+  color:var(--text); box-shadow:0 6px 18px -6px rgba(0,0,0,.55); opacity:0; transform:translateY(12px) scale(.9); pointer-events:none;
+  transition:opacity .2s ease, transform .2s ease; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.to-top.show{ opacity:1; transform:none; pointer-events:auto; }
+.to-top:active{ background:var(--bg-elevated); }
 .bottom-bar .icon-btn.chat-sq{ width:54px; height:54px; border-radius:16px; font-size:21px; flex:none; display:flex; align-items:center; justify-content:center; }
 .bottom-bar .icon-btn.chat-sq svg{ width:24px; height:24px; }
 .bottom-bar .send-btn{ height:54px; }
@@ -774,6 +781,7 @@ input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:tex
 </head>
 <body>
 <div id="app"></div>
+<button type="button" class="to-top" id="toTopBtn" aria-label="Na vrh" title="Na vrh"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg></button>
 
 <script>
 /* ===== Zakazivanje guma (Tire Time) =====
@@ -1657,7 +1665,30 @@ function render(){
   if(searchOpen){
     setTimeout(()=>{ const el=document.getElementById('searchInput'); if(el) el.focus(); }, 30);
   }
+  toTopSync();   /* v30 */
 }
+/* v30: strelica na vrh kao u Arhivi — posle trećine ekrana skrolovanja; stoji iznad donje trake (bez trake: pri dnu);
+   dok se kuca (polje u fokusu) je nema; prozori i obrazac je pokrivaju sami (viši slojevi). */
+var _toTopId = 0;
+function toTopSync(){
+  if(_toTopId) return;
+  _toTopId = requestAnimationFrame(()=>{
+    _toTopId = 0;
+    const btn = document.getElementById('toTopBtn'); if(!btn) return;
+    const ae = document.activeElement, typing = ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName);
+    const on = window.scrollY > window.innerHeight / 3 && !typing;
+    if(on){
+      const bar = document.querySelector('#app .bottom-bar');
+      const h = bar && bar.offsetHeight ? window.innerHeight - bar.getBoundingClientRect().top : 0;
+      btn.style.bottom = h > 0 ? (Math.round(h) + 14) + 'px' : '';
+    }
+    btn.classList.toggle('show', on);
+  });
+}
+document.getElementById('toTopBtn').onclick = ()=>{ document.getElementById('toTopBtn').classList.remove('show'); window.scrollTo({top:0, behavior:'smooth'}); };
+window.addEventListener('scroll', toTopSync, {passive:true});
+window.addEventListener('resize', toTopSync);
+document.addEventListener('focusin', toTopSync); document.addEventListener('focusout', toTopSync);
 
 let searchCloseFn = null;
 function toggleViewMode(){
@@ -1842,7 +1873,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 29; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 30; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
