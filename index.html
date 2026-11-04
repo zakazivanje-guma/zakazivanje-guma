@@ -646,7 +646,7 @@ input::selection, textarea::selection{ background:color-mix(in srgb, var(--frame
 /* šta nije uneto (v25): crven naziv + crvena oznaka „nije uneto“, deblji crven okvir i bledocrvena unutrašnjost — za sva praćena polja */
 .field.miss > label{ color:var(--coral); }
 .field.miss > label .miss-tx{ display:inline-block; margin-left:6px; padding:1px 8px; border-radius:9px; background:var(--coral); color:#fff; font-size:11.5px; font-weight:700; line-height:1.5; }
-.form-full .field.miss input, .form-full .field.miss .tp-field{ border:2px solid var(--coral); background:color-mix(in srgb, var(--coral) 12%, var(--bg-elevated)); box-shadow:none; }
+.form-full .field.miss input, .form-full .field.miss textarea, .form-full .field.miss .tp-field{ border:2px solid var(--coral); background:color-mix(in srgb, var(--coral) 12%, var(--bg-elevated)); box-shadow:none; }
 /* v26: red istorije klijenta u obrascu i zbir u prozoru istorije */
 .hist-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; text-align:left; margin:0 0 14px; padding:11px 13px; border-radius:12px; border:1px solid var(--line); background:var(--green-pale); color:var(--text); font:inherit; font-size:15px; cursor:pointer; }
 .hist-row .hs-sub{ display:block; font-size:13px; color:var(--text-dim); margin-top:2px; font-weight:400; }
@@ -1842,7 +1842,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 28; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 29; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -2580,7 +2580,7 @@ function refreshFormWarnings(){
   refreshMissMarks();
 }
 /* polja koja nisu uneta: crven naziv + „nije uneto“ (obavezna i crven okvir). Kod praznog novog termina tek posle „Sačuvaj“. */
-const MARK_FIELDS = ['datum','vreme','ime','auto','dimenzije','iznos'];
+const MARK_FIELDS = ['datum','vreme','ime','auto','dimenzije','iznos','napomena','telefon']; /* v29 (Zoran 4.11.): i napomena i telefon; polja bez primera „npr.“ */
 function refreshMissMarks(){
   if(!formDraft) return;
   const show = !!(formEditId || formAiWarnings.length || formTried);
@@ -2616,14 +2616,14 @@ function renderItemForm(){
     '<div class="field req" data-k="datum">'+L('datum','Datum',1)+'<input id="fDatum" type="date" value="'+v('datum')+'" oninput="updateDraft(\'datum\',this.value)" onchange="onDatumChange(this)"></div>'+
     '<div class="field req" data-k="vreme">'+L('vreme','U koliko sati',1)+'<button type="button" id="fVreme" class="tp-field'+(formDraft.vreme?'':' empty')+'" onclick="openTimePicker()">'+(formDraft.vreme ? escapeHtml(formDraft.vreme) : 'izaberi')+'</button></div>'+
     '</div>'+
-    '<div class="field req" data-k="ime">'+L('ime','Ime i prezime',1)+'<input id="fIme" type="text" '+F+' value="'+v('ime')+'" oninput="updateDraft(\'ime\',this.value)" onchange="checkReturnClientInForm(false)" placeholder="npr. Petar Petrović"></div>'+
-    '<div class="field" data-k="auto">'+L('auto','Auto model')+'<input id="fAuto" type="text" '+F+' value="'+v('auto')+'" oninput="updateDraft(\'auto\',this.value)" placeholder="npr. Golf 7"></div>'+
+    '<div class="field req" data-k="ime">'+L('ime','Ime i prezime',1)+'<input id="fIme" type="text" '+F+' value="'+v('ime')+'" oninput="updateDraft(\'ime\',this.value)" onchange="checkReturnClientInForm(false)"></div>'+
+    '<div class="field" data-k="auto">'+L('auto','Auto model')+'<input id="fAuto" type="text" '+F+' value="'+v('auto')+'" oninput="updateDraft(\'auto\',this.value)"></div>'+
     '<div class="field" data-k="dimenzije">'+L('dimenzije','Prečnik')+'<div class="r-wrap"><span class="r-pre">R</span>'+
-      '<input id="fDimR" type="text" inputmode="decimal" '+F+' value="'+escapeHtml(rimOf(formDraft.dimenzije))+'" oninput="onRimInput(this,event)" placeholder="16"></div></div>'+
-    '<div class="field" data-k="iznos">'+L('iznos','Iznos (din)')+'<input id="fIznos" type="text" inputmode="numeric" '+F+' value="'+escapeHtml(fmtThou(formDraft.iznos))+'" oninput="onIznosInput(this,event)" placeholder="npr. 4.500"></div>'+
-    '<div class="field" data-k="napomena"><label>Napomena</label><textarea id="fNapomena" '+F+' oninput="updateDraft(\'napomena\',this.value)" placeholder="npr. doneće svoje gume">'+v('napomena')+'</textarea></div>'+
-    '<div class="field" data-k="telefon"><label>Telefon</label><div class="tel-row">'+
-      '<input id="fTel" type="tel" inputmode="tel" '+F+' value="'+v('telefon')+'" oninput="updateDraft(\'telefon\',this.value)" placeholder="npr. 064 123 45 67">'+
+      '<input id="fDimR" type="text" inputmode="decimal" '+F+' value="'+escapeHtml(rimOf(formDraft.dimenzije))+'" oninput="onRimInput(this,event)"></div></div>'+
+    '<div class="field" data-k="iznos">'+L('iznos','Iznos (din)')+'<input id="fIznos" type="text" inputmode="numeric" '+F+' value="'+escapeHtml(fmtThou(formDraft.iznos))+'" oninput="onIznosInput(this,event)"></div>'+
+    '<div class="field" data-k="napomena">'+L('napomena','Napomena')+'<textarea id="fNapomena" '+F+' oninput="updateDraft(\'napomena\',this.value)">'+v('napomena')+'</textarea></div>'+
+    '<div class="field" data-k="telefon">'+L('telefon','Telefon')+'<div class="tel-row">'+
+      '<input id="fTel" type="tel" inputmode="tel" '+F+' value="'+v('telefon')+'" oninput="updateDraft(\'telefon\',this.value)">'+
       '<a class="tel-btn" href="tel:" aria-label="Otvori Telefon">📞</a>'+
       '<button type="button" class="tel-btn" onclick="pasteTel()" aria-label="Nalepi broj">📋</button>'+
     '</div></div>'+
