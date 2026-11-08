@@ -867,7 +867,11 @@ function normDoneFlags(){
 }
 /* pretraga i prepoznavanje klijenta: bez obzira na kvačice, veličinu slova, ćirilicu ili latinicu */
 const CYR_LAT = {'а':'a','б':'b','в':'v','г':'g','д':'d','ђ':'đ','е':'e','ж':'ž','з':'z','и':'i','ј':'j','к':'k','л':'l','љ':'lj','м':'m','н':'n','њ':'nj','о':'o','п':'p','р':'r','с':'s','т':'t','ћ':'ć','у':'u','ф':'f','х':'h','ц':'c','ч':'č','џ':'dž','ш':'š'};
-function foldAll(s){ return foldDiacritics(String(s||'').toLowerCase().replace(/[а-яђјљњћџ]/g, ch=>CYR_LAT[ch]||ch)).replace(/\s+/g,' ').trim(); }
+/* v32: i strane oznake (ë, é, ö, ñ...) — razloži slovo pa skini oznaku; ø æ œ ß ł nemaju razlaganje */
+const FOLD_X = {'ø':'o','æ':'ae','œ':'oe','ß':'ss','ł':'l'};
+function foldAll(s){ return foldDiacritics(String(s||'').toLowerCase().replace(/[а-яђјљњћџ]/g, ch=>CYR_LAT[ch]||ch)).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[øæœßł]/g, ch=>FOLD_X[ch]).replace(/\s+/g,' ').trim(); }
+/* v32: pretraga zanemaruje i znakove između (crtica, tačka, razmak): „c4“ nalazi „C-4“, „golf7“ nalazi „Golf 7“ */
+function compactKey(s){ return String(s||'').replace(/[^a-z0-9]/g,''); }
 function telKey(v){ const d = String(v||'').replace(/\D/g,''); return d.length >= 6 ? d.slice(-8) : ''; }
 function nameKey(v){ return foldAll(v).split(' ').filter(Boolean).sort().join(' '); }
 /* klijent iz Završenog: isti telefon (poslednjih 8 cifara) ili isto ime i prezime (bilo kojim redom); najnoviji */
@@ -1691,7 +1695,7 @@ function render(){
   let listHtml, n;
   if(qWords.length){
     /* pretraga uvek u svim terminima: zakazani, pa završeni */
-    const hit = it=>{ const hay = foldAll([it.ime, it.auto, it.dimenzije, it.napomena, it.telefon, String(it.telefon||'').replace(/\D/g,''), it.iznos, dmyFromISO(it.datum), it.vreme].filter(x=>x!==null && x!==undefined).join(' ')); return qWords.every(w=>hay.includes(w)); };
+    const hit = it=>{ const hay = foldAll([it.ime, it.auto, it.dimenzije, it.napomena, it.telefon, String(it.telefon||'').replace(/\D/g,''), it.iznos, dmyFromISO(it.datum), it.vreme].filter(x=>x!==null && x!==undefined).join(' ')); const hayC = compactKey(hay); return qWords.every(w=>{ const c = compactKey(w); return hay.includes(w) || !c || hayC.includes(c); }); };
     const a = sortAppts(up.filter(hit), false), b = sortAppts(done.filter(hit), true), o = sortAppts(otk.filter(hit), true);
     n = a.length + b.length + o.length;
     listHtml = n===0 ? '<div class="empty">Nema termina koji odgovaraju pretrazi "'+escapeHtml(searchQuery)+'".</div>' :
@@ -1961,7 +1965,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 31; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 32; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -3204,7 +3208,7 @@ function openHelpScreen(){
     { t:'Zakazano i Završeno', c:'Na početnom ekranu su zakazani termini po danima, unutar dana po vremenu; uz svaki dan piše broj termina i ukupan iznos. Povuci karticu udesno: pojavi se zeleno "Završeno", dodir na njega prebacuje termin u Završeno. Termin kome je prošao dan, a nije završen, ostaje gore sa crvenim naslovom "Prošlo". Kvadrat "Završeno" otvara završene termine (najnoviji gore); ponovni dodir ili korak nazad vraća zakazane.' },
     { t:'Vraćanje iz Završenog', c:'U Završenom drži prst na kartici: uključi se označavanje (dodirom dodaješ ili skidaš kartice, "Označi sve" gore). Dole "Vrati u zakazane" ili "Obriši" (ide u korpu); ✕ ili korak nazad prekida. Može i prevlačenjem udesno: "Vrati". Termin kome je prošlo vreme otvara kalendar: izabereš nov dan, pa sat i minute (prošlo vreme se ne prihvata); ostali podaci ostaju. Kad unosiš nov termin, a isti klijent (ime ili telefon) postoji u Završenom, aplikacija pita: "Vrati njega" upiše sve njegove podatke, "Novi klijent" pravi nov termin. Stari završeni termin pri tome ostaje u istoriji klijenta.' },
     { t:'Istorija klijenta', c:'Svaki završen termin je zapis u istoriji klijenta, kao servisna knjižica. Kad klijent ima bar jednu završenu zamenu, na vrhu svakog njegovog termina piše "Ranije: …" (na samom završenom terminu "Istorija: …") sa poslednjom zamenom; dodir otvara sve njegove zamene (datum, auto, prečnik, napomena, iznos, ukupno). Dodir na zamenu otvara je za izmenu ili dopisivanje; korak nazad vraća u termin. Isti klijent se prepoznaje po telefonu, a bez telefona po imenu i prezimenu. Brisanje zapisa iz istorije traži potvrdu; obrisano je u korpi koliko dana je podešeno.' },
-    { t:'Pretraga i prikaz', c:'"Pretraži" traži po imenu, autu, prečniku, napomeni, telefonu i iznosu, uvek i u zakazanim i u završenim (prvo zakazani), bez obzira na kvačice, velika slova i ćirilicu ili latinicu. Ikonica ▦/☰ menja prikaz između liste i mreže. Na kartici je ime, a ispod sitno auto, prečnik, napomena i telefon (dodir na broj zove); iznos je desno.' },
+    { t:'Pretraga i prikaz', c:'"Pretraži" traži po imenu, autu, prečniku, napomeni, telefonu i iznosu, uvek i u zakazanim i u završenim (prvo zakazani), bez obzira na kvačice i druge oznake nad slovima (č, ë, é...), velika slova, ćirilicu ili latinicu i znakove između (crtica, tačka, razmak: „c4“ nalazi i „C-4“). Ikonica ▦/☰ menja prikaz između liste i mreže. Na kartici je ime, a ispod sitno auto, prečnik, napomena i telefon (dodir na broj zove); iznos je desno.' },
     { t:'Sortiranje', c:'"Sortiraj": "Datum i vreme" ređa termine po danu, pa po vremenu. "Ručno (ručke)" prikaže ručku (⠿) desno na svakoj kartici: drži je i prevuci karticu na novo mesto, u okviru istog dana. Ručni redosled se pamti.' },
     { t:'Izmena podataka', c:'Dodir na polje ga osenči: Backspace te vrati na prethodno polje bez brisanja, a prvo slovo ili mikrofon zameni stari tekst novim. Drugi dodir vraća tekst u polje za uređivanje dela teksta. Ako izađeš bez unosa, stari tekst ostaje. Taster za brisanje na označenom ili praznom polju ne briše, nego te vrati na prethodno polje.' },
     { t:'Obaveštenja', c:'Sve poruke aplikacije pojavljuju se gore, u okviru sa velikim slovima: zeleno kad je nešto urađeno, crveno kad nešto nije uspelo. Okvir nestane sam (posle 4 sekunde, greška posle 6).' },
