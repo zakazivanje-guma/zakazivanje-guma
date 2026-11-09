@@ -904,6 +904,28 @@ function findClash(datum, vreme, excludeId){
   if(!datum || !vreme) return null;
   return items.find(x=>x.id!==excludeId && !isDone(x) && x.datum===datum && x.vreme===vreme) || null;
 }
+/* v33 ISTI KLIJENT VEĆ ZAKAZAN: isti telefon (poslednjih 8 cifara) ili isto ime i prezime (najmanje 2 reči, bilo kojim redom)
+   među zakazanim (ne Završeno/Otkazano). orig = termin koji se menja: upozorava se samo ako je ime/telefon promenjen. */
+function findDupClient(ime, tel, excludeId, orig){
+  let nk = nameKey(ime); if(nk.split(' ').length < 2) nk = '';
+  let tk = telKey(tel);
+  if(orig){ if(tk && tk===telKey(orig.telefon)) tk = ''; if(nk && nk===nameKey(orig.ime)) nk = ''; }
+  if(!nk && !tk) return null;
+  const m = items.filter(x=> x.id!==excludeId && !isDone(x) && ((tk && telKey(x.telefon)===tk) || (nk && nameKey(x.ime)===nk)))
+    .sort((a,b)=> a.datum.localeCompare(b.datum) || String(a.vreme||'').localeCompare(String(b.vreme||'')));
+  if(!m.length) return null;
+  return { x: m[0], byTel: !!(tk && telKey(m[0].telefon)===tk) };
+}
+function dupWhen(x){ return dayLabel(x.datum)+(x.vreme ? ' u '+x.vreme : ''); }
+/* jedan prozor za oba upozorenja (isto vreme i isti klijent); vraća false ako nema upozorenja */
+function warnBeforeSave(clash, dup, question, onYes, yesLabel){
+  if(!clash && !dup) return false;
+  const p = [];
+  if(clash) p.push('U '+clash.vreme+' ('+dayLabel(clash.datum)+') je već zakazan: '+(clash.ime||'bez imena')+(clash.auto?', '+clash.auto:'')+'.');
+  if(dup) p.push((dup.x.ime||'bez imena')+' ('+(dup.byTel ? 'isti broj telefona' : 'isto ime i prezime')+') već ima termin: '+dupWhen(dup.x)+'.');
+  showClashWarning(p.join(' ')+' '+question, onYes, yesLabel, clash && dup ? 'Upozorenje' : clash ? 'Isto vreme' : 'Već zakazan');
+  return true;
+}
 function apptShort(it){ return (it.ime||'bez imena')+', '+dayLabel(it.datum)+(it.vreme?' u '+it.vreme:''); }
 function normIznos(v){ if(v===null || v===undefined) return null; const s = String(v).replace(/[^\d]/g,''); return s==='' ? null : Number(s); }
 function normVreme(v){
@@ -1609,8 +1631,7 @@ function reviveOnDate(id, datum, vreme){
     render();
     showNote('Vraćeno u zakazane: '+apptShort(it), { ms: 5000 });
   };
-  const c = findClash(datum, vreme, id);
-  if(c){ showClashWarning('U '+vreme+' ('+dayLabel(datum)+') je već zakazan: '+(c.ime||'bez imena')+(c.auto?', '+c.auto:'')+'. Da li ipak želiš da vratiš i ovaj termin?', go); return; }
+  if(warnBeforeSave(findClash(datum, vreme, id), findDupClient(it.ime, it.telefon, id), 'Da li ipak želiš da vratiš i ovaj termin?', go, 'Ipak vrati')) return;
   go();
 }
 /* stari klijent: nov termin, a isti klijent (ime ili telefon) postoji u Završenom → ponuda da se vrati njegov termin */
@@ -1965,7 +1986,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 32; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 33; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -2193,8 +2214,8 @@ function applyVoiceChange(id, r, text){
     showNote((old.ime||'bez imena')+': '+parts.join(', ')+(r.nesigurno ? '. Proveri: '+r.nesigurno : ''), { ms: 8000 });
   };
   const c = (ch.datum || ch.vreme) ? findClash(nd, nv, id) : null;
-  if(c) showClashWarning('U '+nv+' ('+dayLabel(nd)+') je već zakazan: '+(c.ime||'bez imena')+(c.auto?', '+c.auto:'')+'. Pomeriti ipak, ili je ovo greška?', go, 'Ipak pomeri');
-  else go();
+  const dp = ('ime' in ch || 'telefon' in ch) ? findDupClient('ime' in ch ? ch.ime : it.ime, 'telefon' in ch ? ch.telefon : it.telefon, id, it) : null;
+  if(!warnBeforeSave(c, dp, c ? 'Pomeriti ipak, ili je ovo greška?' : 'Sačuvati ipak, ili je ovo greška?', go, c ? 'Ipak pomeri' : 'Ipak sačuvaj')) go();
 }
 let chgCloseFn = null, __chgPick = null, __chgCancel = null;
 function showChangePick(cands, onPick, onCancel, title){
@@ -2217,12 +2238,8 @@ function runChg(id){
   setTimeout(()=>{ const i = afterBackQ.indexOf(fn); if(i!==-1){ afterBackQ.splice(i,1); fn(); } }, 400);
 }
 function saveRecognizedChecked(r){
-  const c = findClash(r.datum, r.vreme, null);
-  if(c){
-    render();
-    showClashWarning('U '+r.vreme+' ('+dayLabel(r.datum)+') je već zakazan: '+(c.ime||'bez imena')+(c.auto?', '+c.auto:'')+'. Dodati ipak, ili je ovo greška?', ()=>{ saveRecognized(r); });
-    return;
-  }
+  const c = findClash(r.datum, r.vreme, null), dp = findDupClient(r.ime, r.telefon, null);
+  if(c || dp){ render(); warnBeforeSave(c, dp, 'Dodati ipak, ili je ovo greška?', ()=>{ saveRecognized(r); }); return; }
   saveRecognized(r);
 }
 /* stari klijent iz glasovnog unosa: njegov termin se vraća sa novim danom i vremenom; rečeno (auto, iznos…) zamenjuje staro */
@@ -2241,9 +2258,7 @@ function reviveRecognized(id, r){
     render(); refocusInput(); scrollAndHighlightItem(nt.id);
     showNote('Vraćen stari klijent: '+nt.ime+', '+dayLabel(nt.datum)+' u '+nt.vreme+(r.nesigurno ? '. Proveri: '+r.nesigurno : ''), { ms: 6000 });
   };
-  const c = findClash(r.datum, r.vreme, id);
-  if(c) showClashWarning('U '+r.vreme+' ('+dayLabel(r.datum)+') je već zakazan: '+(c.ime||'bez imena')+(c.auto?', '+c.auto:'')+'. Dodati ipak, ili je ovo greška?', go);
-  else go();
+  if(!warnBeforeSave(findClash(r.datum, r.vreme, id), findDupClient(it.ime, r.telefon || it.telefon, id), 'Dodati ipak, ili je ovo greška?', go)) go();
 }
 function saveRecognized(r){
   const id = uid('t');
@@ -2694,8 +2709,16 @@ function formWarningsHtml(){
   let h = '';
   const c = findClash(normDatum(formDraft.datum), normVreme(formDraft.vreme), formEditId);
   if(c) h += '<div class="field-warn" style="margin-bottom:10px; color:var(--coral);">⚠ U to vreme je već zakazan: '+escapeHtml((c.ime||'bez imena')+(c.auto?', '+c.auto:''))+'.</div>';
+  const dp = formDupClient();
+  if(dp) h += '<div class="field-warn dup-warn" style="margin-bottom:10px; color:var(--coral);">⚠ '+(dp.byTel ? 'Ovaj broj' : 'Ovo ime i prezime')+' već ima termin: '+escapeHtml((dp.x.ime||'bez imena')+', '+dupWhen(dp.x))+'.</div>';
   if(formAiNote) h += '<div class="field-hint" style="margin:-4px 0 12px;">AI je pretpostavio: '+escapeHtml(formAiNote)+'</div>';
   return h;
+}
+/* izmena zakazanog: upozorava samo promenjeno ime/telefon; vraćanje iz Završenog/nov termin: poredi sa svim zakazanim */
+function formDupClient(d){
+  d = d || formDraft;
+  const o = formEditId ? getItem(formEditId) : null;
+  return findDupClient(d.ime, d.telefon, formEditId, (o && !isDone(o)) ? o : null);
 }
 function refreshFormWarnings(){
   const box = document.getElementById('formWarn'); if(box) box.innerHTML = formWarningsHtml();
@@ -2839,11 +2862,7 @@ function saveItemForm(){
   if(formRevive){ d.zavrseno = null; d.otkazano = null; }
   /* v26: „Vrati njega“ iz obrasca: zapis istorije ostaje, čuva se kao nov termin */
   const editId = (formRevive && formEditId && getItem(formEditId) && isHistRec(getItem(formEditId))) ? null : formEditId;
-  const c = findClash(d.datum, d.vreme, editId);
-  if(c){
-    showClashWarning('U '+d.vreme+' ('+dayLabel(d.datum)+') je već zakazan: '+(c.ime||'bez imena')+(c.auto?', '+c.auto:'')+'. Da li ipak želiš da sačuvaš i ovaj termin?', ()=>{ doSaveItem(editId, d); });
-    return;
-  }
+  if(warnBeforeSave(findClash(d.datum, d.vreme, editId), formDupClient(d), 'Da li ipak želiš da sačuvaš i ovaj termin?', ()=>{ doSaveItem(editId, d); }, 'Ipak sačuvaj')) return;
   doSaveItem(editId, d);
 }
 /* nov termin u obrascu: posle imena (i pri čuvanju) proveri Završeno; „Vrati njega“ upiše njegove podatke, bira se samo dan i vreme */
@@ -3204,6 +3223,7 @@ function openHelpScreen(){
     { t:'Kad nešto nedostaje', c:'Datum, vreme i ime su obavezni. Ako AI ne prepozna neko od njih, otvori se izmena sa onim što je razumeo; šta nije uneto ima crven okvir i oznaku „nije uneto“. Termin se čuva tek kad dopuniš obavezno.' },
     { t:'Google kalendar', c:'Podešavanja → Google kalendar → Poveži (prvi put izabereš nalog i dozvoliš). Posle toga se budući zakazani termini sami upisuju u Google kalendar, a izmena ili brisanje ovde menja i kalendar; obrisani nestaju iz kalendara, a završeni tamo ostaju. Završavanje i vraćanje iz Završenog ne otvaraju Google-ov prozor. Kalendar šalje podsetnik na zaključan ekran (15 min, 30 min, 1 h ili 2 h pre, biraš u Podešavanjima). Google ponekad ponovo traži potvrdu: posle čuvanja na trenutak iskoči Google-ov prozor, ili gore piše "Kalendar čeka" pa dodirneš Pošalji.' },
     { t:'Isto vreme', c:'Ako u isto vreme (isti dan i sat) već postoji termin, aplikacija pita da li ipak dodaješ. Takvi termini na spisku imaju oznaku "isto vreme", a u obrascu piše ko je već zakazan.' },
+    { t:'Već zakazan', c:'Ako isti broj telefona ili isto ime i prezime već ima zakazan termin, u obrascu piše crveno ko je to i kada, a pri čuvanju aplikacija pita da li ipak čuvaš. Samo ime (bez prezimena) i klijenti iz Završenog ne izazivaju upozorenje.' },
     { t:'Dodaj', c:'Dodir na Dodaj odmah otvara kalendar; posle datuma izađe panel "U koliko sati?" (sat, pa minuti :00/:15/:30/:45), a dodir na minut otvara tastaturu za ime. Za tačno vreme dodirni ⌨️ u panelu i ukucaj cifre (1035 = 10:35, 24 sata), pa Upiši. Dugme "Dodaj" gore otvara prazan obrazac za ručni unos: datum, vreme, ime i prezime (obavezno), auto, prečnik (ukucaš 16 → R16), iznos, napomena i telefon. Pored telefona: 📞 otvara Telefon (Nedavni → drži prst na broju → Kopiraj → nazad), 📋 upisuje kopirani broj. Strelica na tastaturi prelazi na sledeće polje; posle telefona stane na "Sačuvaj" (uokvireno), a dodir na njega čuva termin.' },
     { t:'Zakazano i Završeno', c:'Na početnom ekranu su zakazani termini po danima, unutar dana po vremenu; uz svaki dan piše broj termina i ukupan iznos. Povuci karticu udesno: pojavi se zeleno "Završeno", dodir na njega prebacuje termin u Završeno. Termin kome je prošao dan, a nije završen, ostaje gore sa crvenim naslovom "Prošlo". Kvadrat "Završeno" otvara završene termine (najnoviji gore); ponovni dodir ili korak nazad vraća zakazane.' },
     { t:'Vraćanje iz Završenog', c:'U Završenom drži prst na kartici: uključi se označavanje (dodirom dodaješ ili skidaš kartice, "Označi sve" gore). Dole "Vrati u zakazane" ili "Obriši" (ide u korpu); ✕ ili korak nazad prekida. Može i prevlačenjem udesno: "Vrati". Termin kome je prošlo vreme otvara kalendar: izabereš nov dan, pa sat i minute (prošlo vreme se ne prihvata); ostali podaci ostaju. Kad unosiš nov termin, a isti klijent (ime ili telefon) postoji u Završenom, aplikacija pita: "Vrati njega" upiše sve njegove podatke, "Novi klijent" pravi nov termin. Stari završeni termin pri tome ostaje u istoriji klijenta.' },
@@ -3297,11 +3317,11 @@ function showExitConfirm(){
 /* ---------- UPOZORENJE: ISTO VREME (Apotekin prozor za duplikat) ---------- */
 let __dupYes = null;
 let dupCloseFn = null;
-function showClashWarning(msg, onYes, yesLabel){
+function showClashWarning(msg, onYes, yesLabel, title){
   __dupYes = onYes;
   const b = document.createElement('div'); b.className='modal-backdrop'; b.id='dupBackdrop';
   b.innerHTML = '<div class="modal" style="border-radius:22px;">'+
-    '<h2 class="serif">Isto vreme</h2>'+
+    '<h2 class="serif">'+escapeHtml(title||'Isto vreme')+'</h2>'+
     '<p style="font-size:14.5px; color:var(--text); line-height:1.5; margin:0 0 20px;">'+escapeHtml(msg)+'</p>'+
     '<div class="modal-actions"><button class="cancel-btn" onclick="closeDuplicateWarning()">Otkaži</button>'+
     '<button class="save-btn" onclick="runDupYes()">'+(yesLabel||'Ipak dodaj')+'</button></div></div>';
