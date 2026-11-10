@@ -1635,14 +1635,15 @@ function reviveOnDate(id, datum, vreme){
     showBanner('Vreme '+vreme+' je prošlo — izaberi kasnije vreme.');
     openTimePicker(t=>reviveOnDate(id, datum, t), ''); tpNew = isHistRec(it); renderTimePicker(); return;
   }
+  /* v34 (Zoran 10.11.): iz Završenog UVEK nov termin (isti klijent, drugi auto, i isti dan); završena kartica ostaje.
+     v35: posle dana i vremena otvara se obrazac sa njegovim podacima — upisuje se tek na Sačuvaj (upozorenja daje obrazac). */
+  if(isHistRec(it)){
+    const fn = ()=> openNewFromHist(it, datum, vreme);
+    if(suppressPopstateCount > 0){ afterBackQ.push(fn); setTimeout(()=>{ const i = afterBackQ.indexOf(fn); if(i!==-1){ afterBackQ.splice(i,1); fn(); } }, 400); }
+    else fn();
+    return;
+  }
   const go = ()=>{
-    /* v34 (Zoran 10.11.): iz Završenog UVEK nov termin (isti klijent, drugi auto, i isti dan); završena kartica ostaje */
-    if(isHistRec(it)){
-      const nt = histCopy(it); nt.datum = datum; nt.vreme = vreme; items.push(nt);
-      if(!persistItems()){ items = items.filter(x=>x!==nt); render(); return; }
-      render(); scrollAndHighlightItem(nt.id);
-      showNote('Nov termin: '+apptShort(nt)+' — završeni ostaje u Završenom.', { ms: 5000 }); return;
-    }
     const old = { datum: it.datum, vreme: it.vreme, zavrseno: it.zavrseno, otkazano: it.otkazano || null };
     const wasOtk = isCanceled(it);
     it.datum = datum; it.vreme = vreme; clearClosed(it);
@@ -1650,8 +1651,17 @@ function reviveOnDate(id, datum, vreme){
     render();
     showNote('Vraćeno u zakazane: '+apptShort(it), { ms: 5000 });
   };
-  if(warnBeforeSave(findClash(datum, vreme, id), findDupClient(it.ime, it.telefon, id), isHistRec(it) ? 'Da li ipak želiš da dodaš i ovaj termin?' : 'Da li ipak želiš da vratiš i ovaj termin?', go, isHistRec(it) ? 'Ipak dodaj' : 'Ipak vrati')) return;
+  if(warnBeforeSave(findClash(datum, vreme, id), findDupClient(it.ime, it.telefon, id), 'Da li ipak želiš da vratiš i ovaj termin?', go, 'Ipak vrati')) return;
   go();
+}
+/* v35: obrazac NOVOG termina sa podacima završenog (dan i vreme već izabrani); ništa se ne upisuje do Sačuvaj */
+let formFromHist = false;
+function openNewFromHist(it, datum, vreme){
+  if(formCloseFn || !it) return;
+  openItemForm(null);
+  formDraft = { datum: datum, vreme: vreme, ime: it.ime||'', auto: it.auto||'', dimenzije: it.dimenzije||'', iznos: it.iznos==null ? '' : String(it.iznos), napomena: it.napomena||'', telefon: it.telefon||'' };
+  formReturnAsked = true; formFromHist = true;
+  renderItemForm();
 }
 /* stari klijent: nov termin, a isti klijent (ime ili telefon) postoji u Završenom → ponuda da se vrati njegov termin */
 let retCloseFn = null, __retRevive = null, __retNew = null, __retCancel = null;
@@ -2005,7 +2015,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 34; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 35; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -2530,7 +2540,7 @@ function loadFormState(editId){
   formAiWarnings = [];
   formAiNote = '';
   formTried = false;
-  formRevive = false; formReturnAsked = false;
+  formRevive = false; formReturnAsked = false; formFromHist = false;
 }
 function openItemForm(editId, swapFromFn){
   loadFormState(editId);
@@ -2604,7 +2614,7 @@ function renderTimePicker(){
   }
   b.innerHTML = '<div class="tp"><div class="tp-head"><span class="t">U koliko sati?</span><button type="button" class="tp-kb" onclick="tpKbSet(true)" aria-label="Ukucaj tačno vreme">⌨️</button><span class="v">'+(tpH==null?'--':pad(tpH))+':'+(tpM||'--')+'</span></div>'+
     '<div class="tp-lab">1. Sat</div><div class="tp-grid">'+H+'</div>'+
-    '<div class="tp-lab" style="margin-top:12px">2. Minuti — dodir '+(tpOnPick ? (tpNew ? 'upiše nov termin' : 'vrati termin u zakazane') : 'upiše vreme i otvori Ime')+'</div><div class="tp-min">'+M+'</div>'+
+    '<div class="tp-lab" style="margin-top:12px">2. Minuti — dodir '+(tpOnPick ? (tpNew ? 'otvori nov termin sa njegovim podacima' : 'vrati termin u zakazane') : 'upiše vreme i otvori Ime')+'</div><div class="tp-min">'+M+'</div>'+
     '<button type="button" class="tp-x" onclick="closeOverlay(tpCloseFn)">Otkaži</button></div>';
 }
 function tpPickH(h){ tpH = h; renderTimePicker(); }
@@ -2836,9 +2846,9 @@ const histStack = [];
 function openHistItem(id){
   if(!getItem(id) || !formDraft || !homeSheetCloseFn) return;
   if(id === formEditId){ closeHomeSheet(); return; }   /* „ovaj“ = već otvoren */
-  const prev = { id: formEditId, draft: formDraft, ai: formAiWarnings, note: formAiNote, tried: formTried, rev: formRevive, asked: formReturnAsked };
+  const prev = { id: formEditId, draft: formDraft, ai: formAiWarnings, note: formAiNote, tried: formTried, rev: formRevive, asked: formReturnAsked, fh: formFromHist };
   prev.fn = ()=>{ const i = histStack.indexOf(prev); if(i!==-1) histStack.splice(i,1); if(!formCloseFn) return;
-    formEditId = prev.id; formDraft = prev.draft; formAiWarnings = prev.ai; formAiNote = prev.note; formTried = prev.tried; formRevive = prev.rev; formReturnAsked = prev.asked;
+    formEditId = prev.id; formDraft = prev.draft; formAiWarnings = prev.ai; formAiNote = prev.note; formTried = prev.tried; formRevive = prev.rev; formReturnAsked = prev.asked; formFromHist = prev.fh;
     formAnalyzing = false; renderItemForm(); };
   histStack.push(prev);
   swapOverlay(homeSheetCloseFn, prev.fn);
@@ -2917,7 +2927,8 @@ function doSaveItem(editId, d){
   }
   if(!persistItems()) return;   /* „NIJE SAČUVANO!“ je gore; obrazac ostaje otvoren sa unetim podacima */
   render();
-  closeItemForm();
+  if(formFromHist && !editId && pastOnly && pastCloseFn && formCloseFn && !histStack.length) closeOverlaysTogether([formCloseFn, pastCloseFn]);   /* v35: nov termin iz Završenog → u zakazane */
+  else closeItemForm();
   showNote((d.zavrseno===null && editId ? 'Vraćeno u zakazane: ' : editId ? 'Izmene sačuvane: ' : 'Dodato: ')+d.ime+', '+dayLabel(d.datum)+' u '+d.vreme);
   revealCard(editId || newId);   /* posle obaveštenja: ono spusti ekran za jedan red */
 }
@@ -3247,7 +3258,7 @@ function openHelpScreen(){
     { t:'Već zakazan', c:'Ako isti broj telefona ili isto ime i prezime već ima zakazan termin, u obrascu piše crveno ko je to i kada, a pri čuvanju aplikacija pita da li ipak čuvaš. Samo ime (bez prezimena) i klijenti iz Završenog ne izazivaju upozorenje.' },
     { t:'Dodaj', c:'Dodir na Dodaj odmah otvara kalendar; posle datuma izađe panel "U koliko sati?" (sat, pa minuti :00/:15/:30/:45), a dodir na minut otvara tastaturu za ime. Za tačno vreme dodirni ⌨️ u panelu i ukucaj cifre (1035 = 10:35, 24 sata), pa Upiši. Dugme "Dodaj" gore otvara prazan obrazac za ručni unos: datum, vreme, ime i prezime (obavezno), auto, prečnik (ukucaš 16 → R16), iznos, napomena i telefon. Pored telefona: 📞 otvara Telefon (Nedavni → drži prst na broju → Kopiraj → nazad), 📋 upisuje kopirani broj. Strelica na tastaturi prelazi na sledeće polje; posle telefona stane na "Sačuvaj" (uokvireno), a dodir na njega čuva termin.' },
     { t:'Zakazano i Završeno', c:'Na početnom ekranu su zakazani termini po danima, unutar dana po vremenu; uz svaki dan piše broj termina i ukupan iznos. Povuci karticu udesno: pojavi se zeleno "Završeno", dodir na njega prebacuje termin u Završeno. Termin kome je prošao dan, a nije završen, ostaje gore sa crvenim naslovom "Prošlo". Kvadrat "Završeno" otvara završene termine (najnoviji gore); ponovni dodir ili korak nazad vraća zakazane.' },
-    { t:'Novi termin iz Završenog', c:'Isti klijent dolazi ponovo ili ima još jedan auto: u Završenom prevuci njegovu karticu udesno → "Novi termin". Izabereš dan, pa sat i minute (prošlo vreme se ne prihvata) i nov termin je upisan sa svim njegovim podacima; ako je drugi auto, dodirni nov termin i promeni ga. Završena kartica uvek ostaje u Završenom, i kad je nov termin istog dana. Drži prst na kartici: uključi se označavanje (dodirom dodaješ ili skidaš kartice, "Označi sve" gore). Dole: "Novi termin" (kad je označena jedna kartica), "Vrati u zakazane" (ako je termin greškom završen: kartica se vraća u zakazane sa svojim danom i vremenom) ili "Obriši" (ide u korpu); ✕ ili korak nazad prekida. Kad unosiš nov termin, a isti klijent (ime ili telefon) postoji u Završenom, aplikacija pita: "Vrati njega" upiše sve njegove podatke, "Novi klijent" pravi nov termin. Stari završeni termin pri tome ostaje u istoriji klijenta.' },
+    { t:'Novi termin iz Završenog', c:'Isti klijent dolazi ponovo ili ima još jedan auto: u Završenom prevuci njegovu karticu udesno → "Novi termin". Izabereš dan, pa sat i minute (prošlo vreme se ne prihvata) i otvori se nov termin sa svim njegovim podacima: promeni šta treba (na primer drugi auto) i dodirni Sačuvaj — tek tada je upisan i vidiš ga u zakazanima; Otkaži ne upisuje ništa. Završena kartica uvek ostaje u Završenom, i kad je nov termin istog dana. Drži prst na kartici: uključi se označavanje (dodirom dodaješ ili skidaš kartice, "Označi sve" gore). Dole: "Novi termin" (kad je označena jedna kartica), "Vrati u zakazane" (ako je termin greškom završen: kartica se vraća u zakazane sa svojim danom i vremenom) ili "Obriši" (ide u korpu); ✕ ili korak nazad prekida. Kad unosiš nov termin, a isti klijent (ime ili telefon) postoji u Završenom, aplikacija pita: "Vrati njega" upiše sve njegove podatke, "Novi klijent" pravi nov termin. Stari završeni termin pri tome ostaje u istoriji klijenta.' },
     { t:'Istorija klijenta', c:'Svaki završen termin je zapis u istoriji klijenta, kao servisna knjižica. Kad klijent ima bar jednu završenu zamenu, na vrhu svakog njegovog termina piše "Ranije: …" (na samom završenom terminu "Istorija: …") sa poslednjom zamenom; dodir otvara sve njegove zamene (datum, auto, prečnik, napomena, iznos, ukupno). Dodir na zamenu otvara je za izmenu ili dopisivanje; korak nazad vraća u termin. Isti klijent se prepoznaje po telefonu, a bez telefona po imenu i prezimenu. Brisanje zapisa iz istorije traži potvrdu; obrisano je u korpi koliko dana je podešeno.' },
     { t:'Pretraga i prikaz', c:'"Pretraži" traži po imenu, autu, prečniku, napomeni, telefonu i iznosu, uvek i u zakazanim i u završenim (prvo zakazani), bez obzira na kvačice i druge oznake nad slovima (č, ë, é...), velika slova, ćirilicu ili latinicu i znakove između (crtica, tačka, razmak: „c4“ nalazi i „C-4“). Ikonica ▦/☰ menja prikaz između liste i mreže. Na kartici je ime, a ispod sitno auto, prečnik, napomena i telefon (dodir na broj zove); iznos je desno.' },
     { t:'Sortiranje', c:'"Sortiraj": "Datum i vreme" ređa termine po danu, pa po vremenu. "Ručno (ručke)" prikaže ručku (⠿) desno na svakoj kartici: drži je i prevuci karticu na novo mesto, u okviru istog dana. Ručni redosled se pamti.' },
