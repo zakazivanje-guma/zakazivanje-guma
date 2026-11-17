@@ -1568,7 +1568,7 @@ const Slike = (()=>{
     }
   };
 })();
-function vozilaUpotreba(){ const s = new Set(); items.forEach(i=>{ if(i.vozilo) s.add(i.vozilo); }); hotel.forEach(h=>{ if(h.vozilo) s.add(h.vozilo); }); getTrash().forEach(x=>{ if(x.item && x.item.vozilo) s.add(x.item.vozilo); }); return s; }
+function vozilaUpotreba(){ const s = new Set(); items.forEach(i=>{ if(i.vozilo) s.add(i.vozilo); }); hotel.forEach(h=>{ if(h.vozilo) s.add(h.vozilo); }); getTrash().forEach(x=>{ const v = (x.item && x.item.vozilo) || (x.hotel && x.hotel.vozilo); if(v) s.add(v); }); return s; }
 function vozilaPocisti(){ const u = vozilaUpotreba(); [...SLIKE.keys()].forEach(k=>{ if(!u.has(k)) Slike.postavi(k, null); }); }
 /* ---------- FOTOGRAFIJE: cele slike (bez isecanja), umanjene na 1600 px po dužoj strani, JPEG 0,85 ----------
    Galerija: više slika odjednom. Slikaj: kamera unutar aplikacije (getUserMedia + ImageCapture.takePhoto, MDN), više slika
@@ -2048,17 +2048,17 @@ function hotelPickGo(id){
   const go = ()=>openHotelCard(null, it);
   if(hpCloseFn){ afterBackQ.push(go); closeOverlay(hpCloseFn); setTimeout(()=>{ const k = afterBackQ.indexOf(go); if(k!==-1){ afterBackQ.splice(k,1); go(); } }, 400); } else go();
 }
-/* v41: ukloni klijenta iz hotela (potvrda); kopija kartice ostaje u `zg:hotelObrisano` (poslednjih 20) za svaki slučaj */
+/* v41: ukloni klijenta iz hotela (potvrda) → ista korpa kao termini (Podešavanja → Korpa, zadati broj dana); Vrati vraća celu karticu */
 function removeHotelCard(){
   if(!hkId) { hkNoAsk = true; closeHotelCard(); return; }
   const h = hotel.find(x=>x.id===hkId); if(!h) return;
-  showConfirm('Ukloniti '+(h.ime||'klijenta')+' (br. '+h.mesto+') iz hotela? Briše se hotel kartica sa podacima i starim redovima iz Excela; termini i njihove slike ostaju.', ()=>{
+  showConfirm('Ukloniti '+(h.ime||'klijenta')+' (br. '+h.mesto+') iz hotela? Kartica ide u korpu (Podešavanja → Korpa) i odatle može da se vrati; termini i slike ostaju.', ()=>{
+    if(!trashAddHotel(h)){ closeConfirm(); showBanner('Uklanjanje nije uspelo: na telefonu nema mesta za korpu. Isprazni korpu u Podešavanjima pa probaj ponovo.'); return; }
     hotel = hotel.filter(x=>x!==h);
-    if(!persistHotel()){ hotel.push(h); return; }
-    try{ const o = JSON.parse(localStorage.getItem('zg:hotelObrisano')||'[]'); o.unshift(Object.assign({ obrisano: new Date().toISOString() }, h)); localStorage.setItem('zg:hotelObrisano', JSON.stringify(o.slice(0,20))); }catch(e){}
+    if(!persistHotel()){ hotel.push(h); setTrash(getTrash().filter(x=>x.id!==h.id)); return; }
     hkNoAsk = true; closeHotelCard(); render(); if(document.getElementById('hlBackdrop')) renderHotelList();
     if(formDraft && document.getElementById('formBackdrop')) renderItemForm();
-    showNote((h.ime||'Klijent')+' je uklonjen iz hotela.');
+    showNote((h.ime||'Klijent')+' je uklonjen iz hotela (u korpi).');
   }, 'Ukloni');
 }
 /* ---------- hotel kartica (izmena) — isti način kao termin: natpis u polju, napomena-beležnica, ↶ ↷, „Sačuvati izmene?“ ---------- */
@@ -4403,12 +4403,18 @@ function trashAdd(it){
   list.push({ id: it.id, deletedAt: Date.now(), item: JSON.parse(JSON.stringify(it)) });
   return setTrash(list);
 }
+function trashAddHotel(h){
+  const list = getTrash().filter(x=>x.id!==h.id);
+  list.push({ id: h.id, deletedAt: Date.now(), hotel: JSON.parse(JSON.stringify(h)) });
+  return setTrash(list);
+}
 function trashDaysLeft(x){ return Math.max(0, getTrashDays() - Math.floor((Date.now() - x.deletedAt) / 86400000)); }
 function trashPurgeExpired(){
   const list = getTrash(); const keep = list.filter(x=>trashDaysLeft(x) > 0);
   if(keep.length !== list.length) setTrash(keep);
 }
-function trashTileSub(){ const n = getTrash().length; return n ? n+' '+terminRec(n)+' u korpi' : 'Prazna'; }
+function trashTileSub(){ const l = getTrash(), nh = l.filter(x=>x.hotel).length, nt = l.length - nh;
+  return l.length ? [nt ? nt+' '+terminRec(nt) : '', nh ? nh+' hotel '+(nh===1?'kartica':'kartice') : ''].filter(Boolean).join(' + ')+' u korpi' : 'Prazna'; }
 function openTrashScreen(){
   if(!settingsCloseFn || settingsSubFn) return;
   trashPurgeExpired();
@@ -4416,7 +4422,7 @@ function openTrashScreen(){
   const NUM = 'inputmode="numeric" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"';
   setSettingsView('Korpa',
     '<div class="field"><label>Čuvaj obrisano (dana)</label>'+daysFieldHtml('trashDaysInput', getTrashDays())+'</div>'+
-    '<div class="field-hint" style="margin-bottom:14px;">Obrisani termini čekaju ovde toliko dana, pa se sami trajno brišu.</div>'+
+    '<div class="field-hint" style="margin-bottom:14px;">Obrisani termini i uklonjene hotel kartice čekaju ovde toliko dana, pa se sami trajno brišu.</div>'+
     '<div id="trashList"></div>');
   wireBackspace(document.getElementById('trashDaysInput'), null);
   wireDaysField('trashDaysInput', getTrashDays,
@@ -4445,9 +4451,13 @@ function renderTrashList(){
   box.innerHTML = '<div class="trash-top"><button type="button" class="trash-link" onclick="trashToggleAll()">'+(allSel?'Poništi izbor':'Izaberi sve')+'</button>'+
     '<button type="button" class="trash-link danger" onclick="trashEmptyAll()">Isprazni korpu</button></div>'+
     list.slice().sort((a,b)=>b.deletedAt-a.deletedAt).map(x=>{
-      const left = trashDaysLeft(x), it = x.item || {};
+      const left = trashDaysLeft(x), it = x.item || {}, hh = x.hotel;
       const leftTx = left <= 1 ? 'briše se danas' : 'još '+left+' '+daniRec(left);
       const sel = trashSel.has(x.id);
+      if(hh) return '<div class="trash-item'+(sel?' sel':'')+'" data-id="'+escapeHtml(x.id)+'" onclick="trashToggle(this.dataset.id)">'+
+        '<span class="trash-check">'+(sel?'✓':'')+'</span>'+
+        '<div class="trash-tx"><div class="trash-name">🏨 '+escapeHtml((hh.mesto ? 'br. '+hh.mesto+' ' : '')+(hh.ime||'(bez imena)'))+'</div>'+
+        '<div class="trash-sub">'+escapeHtml('hotel kartica · '+leftTx)+'</div></div></div>';
       return '<div class="trash-item'+(sel?' sel':'')+'" data-id="'+escapeHtml(x.id)+'" onclick="trashToggle(this.dataset.id)">'+
         '<span class="trash-check">'+(sel?'✓':'')+'</span>'+
         '<div class="trash-tx"><div class="trash-name">'+escapeHtml((it.vreme||'')+' '+(it.ime||'(bez imena)'))+'</div>'+
@@ -4462,16 +4472,27 @@ function trashToggleAll(){ const list = getTrash(); trashSel = trashSel.size===l
 function trashRestoreSelected(){
   const all = getTrash(), chosen = all.filter(x=>trashSel.has(x.id));
   if(!chosen.length) return;
-  chosen.forEach(x=>{
+  const ct = chosen.filter(x=>x.item), ch = chosen.filter(x=>x.hotel), zauzeto = [];
+  ct.forEach(x=>{
     const it = JSON.parse(JSON.stringify(x.item));
     if(items.some(i=>i.id===it.id)) it.id = uid('t');
     items.push(it);
   });
-  if(!persistItems()){ items = items.slice(0, items.length - chosen.length); render(); return; }   /* v54: ostaje u korpi */
+  if(ct.length && !persistItems()){ items = items.slice(0, items.length - ct.length); render(); return; }   /* v54: ostaje u korpi */
+  if(ch.length){
+    const pre = hotel.slice();
+    ch.forEach(x=>{ const h = JSON.parse(JSON.stringify(x.hotel)); if(hotel.some(y=>y.id===h.id)) h.id = uid('h');
+      const d = hotel.find(y=> hotelAktivan(y) && String(y.mesto).trim()===String(h.mesto).trim()); if(d && hotelAktivan(h)) zauzeto.push('br. '+h.mesto+' ('+(d.ime||'')+')');
+      hotel.push(h); });
+    if(!persistHotel()){ hotel = pre; if(ct.length){ items = items.slice(0, items.length - ct.length); persistItems(); } render(); return; }
+    if(document.getElementById('hlBackdrop')) renderHotelList();
+  }
   setTrash(all.filter(x=>!trashSel.has(x.id)));
   trashSel = new Set();
   render(); renderTrashList();
-  showBanner(chosen.length===1 ? 'Termin „'+(chosen[0].item.ime||'')+'“ je vraćen.' : 'Vraćeno: '+chosen.length+' '+terminRec(chosen.length)+'.', 'info');
+  const msg = chosen.length===1 ? (ch.length ? 'Hotel kartica „'+(ch[0].hotel.ime||'')+'“ je vraćena.' : 'Termin „'+(chosen[0].item.ime||'')+'“ je vraćen.')
+    : 'Vraćeno: '+[ct.length ? ct.length+' '+terminRec(ct.length) : '', ch.length ? ch.length+' hotel '+(ch.length===1?'kartica':'kartice') : ''].filter(Boolean).join(' + ')+'.';
+  showBanner(msg + (zauzeto.length ? ' Pažnja: mesto '+zauzeto.join(', ')+' već ima drugog klijenta — promeni broj u kartici.' : ''), zauzeto.length ? undefined : 'info');
 }
 function trashPurgeSelected(){
   const n = trashSel.size; if(!n) return;
@@ -4482,7 +4503,7 @@ function trashPurgeSelected(){
 }
 function trashEmptyAll(){
   const n = getTrash().length; if(!n) return;
-  showConfirm('Isprazniti korpu ('+n+' '+terminRec(n)+')? Ovo se više ne može vratiti.', ()=>{
+  showConfirm('Isprazniti korpu ('+n+')? Ovo se više ne može vratiti.', ()=>{
     setTrash([]); trashSel = new Set(); renderTrashList();
   }, 'Da, isprazni');
 }
@@ -4517,7 +4538,7 @@ function openHelpScreen(){
     { t:'Napomena', c:'Napomena je poslednje polje i zauzima ostatak ekrana. Dodir na nju otvara je preko celog ekrana, kao beležnicu: gore ‹ ↶ ↷ Sačuvaj. Sačuvaj ili korak nazad čuvaju napomenu i vraćaju termin (nov termin je čuva kad ga sačuvaš).' },
     { t:'Zauzeti sati', c:'U panelu „U koliko sati?“ sat u kome tog dana već ima zakazan termin je obojen i ima mali broj termina u uglu. Kad izabereš sat, ispod minuta piše ime klijenta koji je u to vreme, a ispod je spisak svih termina tog sata. Zauzeto može i dalje da se izabere (dva auta u isto vreme).' },
     { t:'Telefon i SMS', c:'Na kartici je broj napisan čitljivo (063 880 8260). U terminu: kad je broj upisan, 📞 zove klijenta, a 💬 otvara Poruke sa gotovim podsetnikom („Poštovani, podsećamo Vas na termin za zamenu guma sutra u 12:00. Tire Time“) — samo dodirneš Pošalji. Kad broja nema, 📞 otvara Telefon (da prepišeš broj iz poziva), a 📋 nalepi kopirani broj.' },
-    { t:'Hotel za gume', c:'Kvadrat 🏨 Hotel otvara spisak klijenata čije gume čuvaš, po grupama: ⚠ Sporno (crveno, npr. nije došao na zamenu), Čekaju zamenu (narandžasto), ✓ Zamenjeno ove sezone (zeleno) i Na čekanju — bez guma kod nas (klijent ostaje u hotelu, npr. gume bačene, a na leto donosi nove). Gore piše sezona (zimska 1.10.–kraj februara, letnja 1.3.–30.9.) i koliko je zamenjeno. Pretraga po imenu, registraciji, dimenziji ili broju. Dodavanje: ＋ Novi → izaberi klijenta iz termina (ili prazna kartica); ili u otvorenom terminu dugme „🏨 U hotel“ na slici; ili dugi pritisak na termin → 🏨 U hotel za gume. Uklanjanje: u hotel kartici dole 🗑 Ukloni (pita pre brisanja).' },
+    { t:'Hotel za gume', c:'Kvadrat 🏨 Hotel otvara spisak klijenata čije gume čuvaš, po grupama: ⚠ Sporno (crveno, npr. nije došao na zamenu), Čekaju zamenu (narandžasto), ✓ Zamenjeno ove sezone (zeleno) i Na čekanju — bez guma kod nas (klijent ostaje u hotelu, npr. gume bačene, a na leto donosi nove). Gore piše sezona (zimska 1.10.–kraj februara, letnja 1.3.–30.9.) i koliko je zamenjeno. Pretraga po imenu, registraciji, dimenziji ili broju. Dodavanje: ＋ Novi → izaberi klijenta iz termina (ili prazna kartica); ili u otvorenom terminu dugme „🏨 U hotel“ na slici; ili dugi pritisak na termin → 🏨 U hotel za gume. Uklanjanje: u hotel kartici dole 🗑 Ukloni (pita pre brisanja) — kartica ide u korpu (Podešavanja → Korpa), odakle se vraća dugmetom Vrati, sa svim podacima i starim redovima.' },
     { t:'Hotel kartica', c:'Mesto (broj) je broj koji pokazuje gde su gume. Tu su adresa, dimenzija, felne, cena čuvanja mesečno, brend letnjih i zimskih, od kada su u hotelu, „Kod nas su: letnje / zimske / ništa“ i Status (Aktivan, ⚠ Sporno, Na čekanju — bez guma). Gore su slike auta, iste kao u terminima; dodir otvara pregled preko celog ekrana (slike se dodaju u terminu). Napomena se otvara preko celog ekrana kao u terminu (↶ ↷ Sačuvaj, nazad čuva). Ispod su finansije: zbir hotel, zamena i ukupno, i svi redovi (stari iz Excela i završeni termini). Zamena sezone okreće letnje ↔ zimske.' },
     { t:'Termin hotel klijenta', c:'Na kartici na početnom ekranu pored imena piše 🏨 i broj (⚠ ako je sporno). U terminu je traka „Hotel br. … · kod nas: …“ — dodir otvara hotel karticu. Iznos je podeljen: Zamena + Hotel = Ukupno; Hotel se sam predloži (meseci od prošle zamene × cena), a možeš ga promeniti. Kad termin prevučeš u Završeno, klijent prelazi u „zamenjeno ove sezone“, a kod nas se okrene (posle zimske zamene: letnje). Ako termin vratiš iz Završenog, vrati se i to.' },
     { t:'Nesačuvana izmena', c:'Ako u terminu nešto promeniš pa ga zatvoriš bez čuvanja (✕, Otkaži, dodir van ili korak nazad), aplikacija pita „Sačuvati izmene?“: Sačuvaj čuva, Otkaži izmene zatvara termin bez promene. Dodir van prozora ili korak nazad vraća u termin.' },
@@ -4536,7 +4557,7 @@ function openHelpScreen(){
     { t:'Izmena podataka', c:'Dodir na polje ga osenči: Backspace te vrati na prethodno polje bez brisanja, a prvo slovo ili mikrofon zameni stari tekst novim. Drugi dodir vraća tekst u polje za uređivanje dela teksta. Ako izađeš bez unosa, stari tekst ostaje. Taster za brisanje na označenom ili praznom polju ne briše, nego te vrati na prethodno polje.' },
     { t:'Obaveštenja', c:'Sve poruke aplikacije pojavljuju se gore, u okviru sa velikim slovima: zeleno kad je nešto urađeno, crveno kad nešto nije uspelo. Okvir nestane sam (posle 4 sekunde, greška posle 6).' },
     { t:'Brisanje prevlačenjem', c:'U prikazu spiska povuci karticu prstom ulevo: ispod nje se pojavi crveno dugme "Izbriši". Dodir na njega traži potvrdu, pa termin ide u korpu. Dodir bilo gde drugde vraća karticu na mesto.' },
-    { t:'Korpa', c:'Obrisan termin ide u korpu (Podešavanja → Korpa) i tamo čeka zadati broj dana (podrazumevano 30), pa se sam trajno briše. U korpi izabereš termine, pa "Vrati" ili "Obriši trajno". Korpa ne ulazi u rezervnu kopiju.' },
+    { t:'Korpa', c:'Obrisan termin i uklonjena hotel kartica (🏨) idu u korpu (Podešavanja → Korpa) i tamo čekaju zadati broj dana (podrazumevano 30; menja se gore u korpi), pa se sami trajno brišu. U korpi izabereš stavke, pa "Vrati" ili "Obriši trajno". Korpa ne ulazi u rezervnu kopiju.' },
     { t:'Rezervna kopija', c:'Podaci se čuvaju samo u Chrome-u na ovom telefonu. Podešavanja → Rezervna kopija: "Podeli kopiju" šalje kopiju na Google Drive ili mejlom (ime kopije ima datum i vreme), "Izvezi bekap" preuzima fajl, "Uvezi bekap" vraća termine iz kopije (.json ili .txt), zajedno sa slikama vozila. Crvena traka gore podseća kad je prošlo više dana od poslednje kopije.' },
     { t:'Dnevnik grešaka', c:'Kad se desi greška, aplikacija je tiho zapiše. Tada u Podešavanjima, ispod broja verzije, sitno crveno piše koliko ih ima — dodir otvara dnevnik. "Kopiraj" stavi ceo dnevnik u međuspremnik, da ga nalepiš u čet; "Obriši dnevnik" ga prazni.' },
     { t:'Brojevi u podešavanjima', c:'Broj dana (podsetnik za bekap, korpa) menjaš u polju, pa dodirneš "Sačuvaj" pored njega ili Enter. Gore se pojavi potvrda. Dozvoljen je broj od 1 do 365. Gemini ključ se čuva tek dugmetom "Sačuvaj".' }
