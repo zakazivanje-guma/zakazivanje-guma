@@ -2122,7 +2122,25 @@ function hkBar(){
   document.querySelectorAll('#hkBackdrop .f-undo').forEach(u=>u.classList.toggle('dim', !hkHist || (hkHist.i <= 0 && !p)));
   document.querySelectorAll('#hkBackdrop .f-redo').forEach(r=>r.classList.toggle('dim', !hkHist || p || hkHist.i >= hkHist.s.length-1));
   const s = document.getElementById('hkSave'); if(s) s.classList.toggle('dim', !!hkId && hkKey() === hkOrig);
-  const ns = document.getElementById('hkNapSave'); if(ns) ns.classList.toggle('dim', !!hkId && hkKey() === hkOrig);
+  const ns = document.getElementById('hkNapSave'); if(ns) ns.classList.toggle('dim', !hkNapDirty());
+}
+/* v42 (Zoran 17.11.): polja hotel kartice rade kao u terminu — modul gboard-backspace (prazno + stari tekst osenčen, Backspace =
+   korak nazad u prethodno polje), strelica tastature = sledeće polje, posle poslednjeg → Sačuvaj */
+const HK_ORDER = ['mesto','ime','auto','tablica','telefon','adresa','dimenzija','felne','cena','letnje','zimske'];
+function wireHkFields(){
+  const els = HK_ORDER.map(k=>document.getElementById('hk_'+k));
+  els.forEach((el,i)=>{
+    if(!el) return;
+    wireBackspace(el, i>0 ? els[i-1] : null);
+    if(el._hkEnter) return; el._hkEnter = true;
+    el.addEventListener('keydown', (e)=>{
+      if(e.key !== 'Enter' || e.isComposing) return;
+      e.preventDefault();
+      const next = els[i+1];
+      if(next){ next.focus(); return; }
+      el.blur(); const sv = document.getElementById('hkSave'); if(sv) sv.focus();
+    });
+  });
 }
 function hkSeg(k, v){ hkDraft[k] = v; hkPush(); renderHotelCard(); }
 function hkSwapSeason(){
@@ -2138,10 +2156,21 @@ function expandHkNap(){
     const mm = document.querySelector('#hkBackdrop .form-full'); if(mm) mm.classList.remove('nap-full');
     const ta = document.getElementById('hkNap'); if(ta && document.activeElement === ta) ta.blur();
     if(!hkDraft) return;
-    if(hkId){ if(hkKey() !== hkOrig) saveHotelCard(true, 'Napomena je sačuvana.'); }
+    if(hkId) saveHkNapOnly();
     else if(String(hkDraft.napomena||'').trim()) showNote('Napomena je u kartici — sačuvaće se sa karticom.');
   };
   pushOverlay(hkNapCloseFn);
+}
+function hkNapDirty(){ const h = hkId && hotel.find(x=>x.id===hkId); return !h || String(hkDraft && hkDraft.napomena||'').trim() !== String(h.napomena||'').trim(); }
+function saveHkNapOnly(){
+  const h = hotel.find(x=>x.id===hkId); if(!h || !hkDraft) return;
+  const nn = String(hkDraft.napomena||'').trim(), old = h.napomena;
+  if(nn === String(old||'').trim()){ hkBar(); return; }
+  h.napomena = nn;
+  if(!persistHotel()){ h.napomena = old; return; }
+  hkOrig = napOrigWith(hkOrig, HK_FIELDS.indexOf('napomena'), nn);
+  render(); if(document.getElementById('hlBackdrop')) renderHotelList(); hkBar();
+  showNote(hkKey() === hkOrig ? 'Napomena je sačuvana.' : 'Napomena je sačuvana. Ostale izmene — dugme Sačuvaj.');
 }
 function collapseHkNap(){ if(hkNapCloseFn) closeOverlay(hkNapCloseFn); }
 function renderHotelCard(){
@@ -2177,7 +2206,7 @@ function renderHotelCard(){
     '<button class="home-sq" onclick="closeHotelCard()"><span class="sq-box">✕</span>Otkaži</button>'+
     '<button class="home-sq cd-save" id="hkSave" onclick="saveHotelCard()"><span class="sq-box">✓</span>Sačuvaj</button></div></div>';
   if(keep){ const nb = b.querySelector('.ff-body'); if(nb) nb.scrollTop = keep; }
-  hkBar();
+  hkBar(); wireHkFields();
   const cb = document.getElementById('hkPic'), pics = hkPics();
   if(cb && pics.length) makeStrip(cb.querySelector('.sw-strip'), { idx:0, zoom:false,
     onIdx:(i)=>{ hkPicIdx = i; const c = document.getElementById('hkCnt'); if(c) c.textContent = (i+1)+' / '+pics.length; }, onTap:()=>openRoViewer(hkPics(), hkPicIdx) });
@@ -3055,7 +3084,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 41; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 42; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -3448,9 +3477,9 @@ function aiFormatStatusHtml(){
    408, 429 i 5xx, sa rastućim čekanjem i malo nasumičnog odstupanja; 400/402/403 se ne ponavljaju).
    Redosled: glavni model → posle ~1 s opet glavni → posle ~2 s rezervni → posle ~4 s opet rezervni.
    Vraća odgovor (resp) čim stigne nešto što nije privremena greška; inače jasna poruka na srpskom. */
+/* MODUL gemini v6 */
 const GEMINI_RETRY_STATUS = [408,429,500,502,503,504];
-/* MODUL gemini v1 */
-function geminiPause(ms){ return new Promise(r=>setTimeout(r, ms + Math.floor(Math.random()*400))); }
+const GEMINI_HEDGE_MS = 3000, GEMINI_HEDGE_PER_MB = 1500;
 function geminiErrorText(body){
   try{ const j = JSON.parse(body); if(j && j.error && j.error.message) return String(j.error.message); }catch(e){}
   return String(body||'');
@@ -3461,39 +3490,142 @@ function geminiHttpError(status, body){
   if(status===400 && /API key/i.test(body)) return new Error('Gemini API ključ nije važeći. Proveri ga u Podešavanjima.');
   return new Error('Gemini greška ('+status+'): '+geminiErrorText(body).slice(0,200));
 }
-async function geminiFetch(models, body, timeoutMs){
-  const apiKey = getApiKey();
-  const plan = [[models[0],0],[models[0],1000],[models[1],2000],[models[1],4000]];
-  let lastStatus = 0;
-  for(let i=0; i<plan.length; i++){
-    const model = plan[i][0];
-    if(!model) continue;
-    if(plan[i][1]) await geminiPause(plan[i][1]);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(()=>controller.abort(), timeoutMs);
-    let resp;
-    try{
-      resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent', {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json', 'x-goog-api-key':apiKey },
-        body: JSON.stringify(body),
-        signal: controller.signal
-      });
-    } catch(fetchErr){
-      logError('Gemini', model+': '+(fetchErr.name==='AbortError' ? 'nema odgovora na vreme' : 'nema veze ('+fetchErr.message+')'));
-      if(fetchErr.name==='AbortError') throw new Error('Server nije odgovorio na vreme. Proveri internet i probaj ponovo.');
-      throw new Error('Ne mogu da se povežem sa AI servisom: '+fetchErr.message);
-    } finally {
-      clearTimeout(timeoutId);
-    }
-    if(GEMINI_RETRY_STATUS.indexOf(resp.status) < 0) return resp;
-    lastStatus = resp.status;
-    await resp.text().catch(()=> '');
+/* SSE delovi (ili običan JSON) → jedan odgovor oblika generateContent; null = nečitljivo */
+function geminiCollect(txt){
+  const t = String(txt || '').trim();
+  let frames = [];
+  if(t[0] === '{' || t[0] === '['){
+    try{ const j = JSON.parse(t); frames = Array.isArray(j) ? j : [j]; }catch(e){ return null; }
+  } else {
+    t.split(/\r?\n\r?\n/).forEach(ev=>{
+      const d = ev.split(/\r?\n/).filter(l=>l.indexOf('data:') === 0).map(l=>l.slice(5).replace(/^ /, '')).join('\n');
+      if(!d.trim()) return;
+      try{ frames.push(JSON.parse(d)); }catch(e){}
+    });
   }
-  logError('Gemini', 'HTTP '+lastStatus+' posle 4 pokušaja (i rezervni model)');
-  if(lastStatus===429) throw new Error('Google AI je trenutno odbio zahtev zbog ograničenja broja zahteva na tvom nalogu. Sačekaj malo pa probaj ponovo.');
-  throw new Error('Google AI je trenutno preopterećen. Aplikacija je pokušala 4 puta, i sa rezervnim modelom. Probaj ponovo za par minuta.');
+  frames = frames.filter(f=>f && typeof f === 'object');
+  if(!frames.length) return null;
+  const er = frames.find(f=>f.error);
+  if(er) return {error:er.error};
+  let text = '', finish = '', usage = null, pf = null, cand = false, gm = null;
+  frames.forEach(f=>{
+    if(f.promptFeedback) pf = f.promptFeedback;
+    if(f.usageMetadata) usage = f.usageMetadata;
+    const c = (f.candidates || [])[0];
+    if(!c) return;
+    cand = true;
+    if(c.finishReason) finish = c.finishReason;
+    if(c.groundingMetadata) gm = c.groundingMetadata;   /* v4 */
+    ((c.content || {}).parts || []).forEach(p=>{ if(typeof p.text === 'string' && !p.thought) text += p.text; });
+  });
+  const data = {candidates:cand ? [{content:{role:'model', parts:[{text}]}, finishReason:finish}] : [], usageMetadata:usage || {}};
+  if(gm && data.candidates[0]) data.candidates[0].groundingMetadata = gm;
+  if(pf) data.promptFeedback = pf;
+  return {data};
 }
+/* Jedan pokušaj: {st: HTTP kod | 'T' (bez odgovora) | 'N' (mreža) | 'X' (prekinuli smo), res, txt} */
+async function geminiAttempt(model, bodyStr, key, ctl, idleMs, onFirst){
+  let timedOut = false, first = false, idle = null;
+  const armIdle = ()=>{ clearTimeout(idle); idle = setTimeout(()=>{ timedOut = true; ctl.abort(); }, idleMs); };
+  armIdle();
+  try{
+    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':streamGenerateContent?alt=sse',
+      {method:'POST', headers:{'Content-Type':'application/json', 'x-goog-api-key':key}, body:bodyStr, signal:ctl.signal});
+    if(!res.ok){
+      let txt = await res.text();
+      try{ const j = JSON.parse(txt); if(Array.isArray(j) && j[0]) txt = JSON.stringify(j[0]); }catch(e){}
+      return {st:res.status, txt, res:new Response(txt, {status:res.status, headers:{'Content-Type':'application/json'}})};
+    }
+    let s = '';
+    if(res.body && res.body.getReader){
+      const rd = res.body.getReader(), dec = new TextDecoder();
+      for(;;){
+        const r = await rd.read();
+        if(r.done) break;
+        if(r.value && r.value.length){ if(!first){ first = true; if(onFirst) onFirst(); } armIdle(); s += dec.decode(r.value, {stream:true}); }
+      }
+      s += dec.decode();
+    } else s = await res.text();
+    const g = geminiCollect(s);
+    if(!g) return {st:'N'};
+    if(g.error){
+      const st = Number(g.error.code) || 500, txt = JSON.stringify({error:g.error});
+      return {st, txt, res:new Response(txt, {status:st, headers:{'Content-Type':'application/json'}})};
+    }
+    return {st:200, res:new Response(JSON.stringify(g.data), {status:200, headers:{'Content-Type':'application/json'}})};
+  }catch(e){
+    if(timedOut) return {st:'T'};
+    if(ctl.signal.aborted) return {st:'X'};
+    return {st:'N', msg:e && e.message};
+  }finally{ clearTimeout(idle); }
+}
+function geminiFetch(models, body, timeoutMs, think, log, opts){
+  opts = opts || {};
+  const key = getApiKey();
+  const queue = [[models[0],0],[models[1],0],[models[0],1000],[models[1],2000]].filter(x=>x[0]);
+  const cache = {};
+  const bodyFor = m=>{
+    if(cache[m]) return cache[m];
+    let b = body;
+    if(think && think[m]) b = Object.assign({}, body, {generationConfig:Object.assign({}, body.generationConfig || {}, {thinkingConfig:{thinkingLevel:think[m]}})});
+    return (cache[m] = JSON.stringify(b));
+  };
+  const hedgeMs = (models[1] || opts.hedgeSame) && !(think && think[models[0]]) ? (opts.hedgeMs || GEMINI_HEDGE_MS) + Math.round(bodyFor(models[0]).length / 1048576 * GEMINI_HEDGE_PER_MB) : 0;
+  return new Promise((resolve, rejectRaw)=>{
+    const reject = e=>{ logError('Gemini', String(e && e.message || e).slice(0,300)); rejectRaw(e); };   /* prilagođeno: dnevnik grešaka */
+    let next = 0, pending = 0, tries = 0, done = false, lastErr = null, hardErr = null, netMsg = '', pauseTm = null, hedgeTm = null;
+    const live = new Map(), dead = new Set();   /* ctl → {m, t0, first} */
+    const finish = fn=>{ if(done) return; done = true; clearTimeout(pauseTm); clearTimeout(hedgeTm); live.forEach((v, c)=>c.abort()); live.clear(); fn(); };
+    const pick = ()=>{ while(next < queue.length && dead.has(queue[next][0])) next++; return next < queue.length ? queue[next++] : null; };
+    const start = wait=>{
+      const q = pick(); if(!q) return false;
+      pending++;
+      if(wait && q[1]) pauseTm = setTimeout(()=>{ pauseTm = null; if(!done) run(q[0]); }, q[1] + Math.floor(Math.random() * 400));
+      else run(q[0]);
+      return true;
+    };
+    const end = ()=>{
+      const e = hardErr || lastErr;
+      if(e && e.st !== 'T') return finish(()=>{
+        /* v5: uz našu poruku ide i tačan tekst Google-a (v4 ga je sakrivao — pouka Apoteka v57: 429 nije uvek „sačekaj malo“) */
+        const gt = e.txt ? ' Poruka Google-a: ' + geminiErrorText(e.txt).slice(0, 220) : '';
+        if(e.st === 429 && !hardErr) reject(new Error('Google AI je odbio zahtev (429 – ograničenje na tvom nalogu, i na rezervnom modelu).' + gt));
+        else if(GEMINI_RETRY_STATUS.indexOf(e.st) >= 0 && !hardErr) reject(new Error('Google AI je trenutno preopterećen (' + e.st + '). Aplikacija je pokušala ' + tries + ' puta, i sa rezervnim modelom. Probaj ponovo za par minuta.' + gt));
+        else { e.res.geminiModel = e.m; resolve(e.res); }
+      });
+      if(e) return finish(()=>reject(new Error('Server nije odgovorio na vreme. Proveri internet i probaj ponovo.')));
+      finish(()=>reject(new Error('Ne mogu da se povežem sa AI servisom: ' + netMsg)));
+    };
+    async function run(m){
+      const idx = tries++, ctl = new AbortController(), me = {m, t0:Date.now(), first:false};
+      live.set(ctl, me);
+      if(idx === 0 && hedgeMs) hedgeTm = setTimeout(()=>{ hedgeTm = null; if(done || next !== 1) return; if(opts.hedgeSame){ pending++; run(models[0]); } else start(false); }, hedgeMs);
+      const r = await geminiAttempt(m, bodyFor(m), key, ctl, timeoutMs, ()=>{ me.first = true; if(idx === 0 && hedgeTm){ clearTimeout(hedgeTm); hedgeTm = null; } });
+      live.delete(ctl); pending--;
+      if(done || r.st === 'X') return;
+      if(idx === 0 && hedgeTm){ clearTimeout(hedgeTm); hedgeTm = null; }
+      if(r.st === 'N'){ netMsg = r.msg || ''; if(!pending) end(); return; }
+      if(log) log.push({st:r.st, ms:Date.now() - me.t0, m});
+      if(r.st === 200){
+        /* pokušaj koji do pobede drugog nije ni počeo da odgovara ulazi u log kao 'T' (vidi se zašto je čekano) */
+        if(log) live.forEach(v=>{ if(!v.first) log.splice(log.length - 1, 0, {st:'T', ms:Date.now() - v.t0, m:v.m}); });
+        r.res.geminiModel = m;
+        return finish(()=>resolve(r.res));
+      }
+      r.m = m;
+      if(r.st === 'T' || GEMINI_RETRY_STATUS.indexOf(r.st) >= 0){
+        if(r.st === 429) dead.add(m);
+        lastErr = r;
+        if(!pending && (hardErr || !start(true))) end();
+        return;
+      }
+      hardErr = hardErr || r;
+      if(!pending) end();
+    }
+    start(false);
+  });
+}
+
 async function geminiStructuredRequest(sys, parts, schema, maxOutputTokens, timeoutMs){
   const attempts = [
     { mode:'format', gc:{ responseFormat:{ text:{ mimeType:'APPLICATION_JSON', schema: schema } }, maxOutputTokens: maxOutputTokens } },
@@ -3653,12 +3785,25 @@ function fhBar(){
   const pend = !!fhTimer;
   document.querySelectorAll('#formBackdrop .f-undo').forEach(u=>u.classList.toggle('dim', !fh || (fh.i <= 0 && !pend)));
   document.querySelectorAll('#formBackdrop .f-redo').forEach(r=>r.classList.toggle('dim', !fh || pend || fh.i >= fh.s.length-1));
-  const ns = document.getElementById('napSave'); if(ns) ns.classList.toggle('dim', !!formEditId && !formRevive && draftKey() === formOrig);
+  const ns = document.getElementById('napSave'); if(ns) ns.classList.toggle('dim', !napDirty());
 }
 /* v36 Napomena kao beležnica (uzor Gde sam ostavio v3): dodir → preko celog ekrana (samo klasa — tekst i fokus se ne
    diraju, Gboard glas radi); gore ‹ ↶ ↷ Sačuvaj; Sačuvaj i korak „nazad“ čuvaju postojeći termin, termin ostaje otvoren.
    Nov termin (još nije upisan): napomena ostaje u obrascu i čuva se sa terminom. „Gotovo“ odbijeno. */
 let napFull = false, napCloseFn = null;
+/* v42 (Zoran 17.11.): izlaz iz napomene čuva SAMO napomenu; ostale izmene termina ostaju nesačuvane i „Sačuvaj“ svetli */
+function napOrigWith(orig, idx, v){ try{ const a = JSON.parse(orig); a[idx] = v; return JSON.stringify(a); }catch(e){ return orig; } }
+function saveNapOnly(){
+  const it = getItem(formEditId); if(!it || !formDraft) return;
+  const nn = String(formDraft.napomena||'').trim(), old = it.napomena;
+  if(nn === String(old||'').trim()){ updateSaveDim(); return; }
+  it.napomena = nn;
+  if(!persistItems()){ it.napomena = old; return; }
+  formOrig = napOrigWith(formOrig, DRAFT_FIELDS.indexOf('napomena'), nn);
+  render(); updateSaveDim();
+  showNote(draftKey() === formOrig ? 'Napomena je sačuvana.' : 'Napomena je sačuvana. Ostale izmene — dugme Sačuvaj.');
+}
+function napDirty(){ const it = formEditId && getItem(formEditId); return !it || formRevive || String(formDraft && formDraft.napomena||'').trim() !== String(it.napomena||'').trim(); }
 function expandNap(){
   if(napFull || !formDraft) return;
   const m = document.querySelector('#formBackdrop .form-full'); if(!m) return;
@@ -3670,7 +3815,7 @@ function expandNap(){
     const mm = document.querySelector('#formBackdrop .form-full'); if(mm) mm.classList.remove('nap-full');
     const ta = document.getElementById('fNapomena'); if(ta && document.activeElement === ta) ta.blur();
     if(!formDraft) return;
-    if(formEditId && !formRevive){ if(draftKey() !== formOrig) saveItemForm(true, 'Napomena je sačuvana.'); }
+    if(formEditId && !formRevive) saveNapOnly();
     else if(String(formDraft.napomena||'').trim()) showNote('Napomena je u terminu — sačuvaće se sa terminom.');
   };
   pushOverlay(napCloseFn);
@@ -3824,7 +3969,7 @@ function tpSetTime(val){
    - Backspace → korak nazad; pri izlasku bez unosa stari tekst se vraća (obrazac ga nije ni gubio);
    - kucanje ili diktat → upisuje se samo novo;
    - drugi dodir → stari tekst se vrati u polje za uređivanje dela. */
-/* MODUL gboard-backspace v2 */
+/* MODUL gboard-backspace v3 */
 const fieldOriginal = new WeakMap();
 const pristineArmed = new WeakSet();
 function snapshotField(el){ fieldOriginal.set(el, el.value); }
@@ -3832,7 +3977,7 @@ function armField(el){
   const orig = el.value;
   fieldOriginal.set(el, orig);
   if(el.dataset.ph == null) el.dataset.ph = el.getAttribute('placeholder') || '';
-  el.setAttribute('placeholder', orig);
+  el.setAttribute('placeholder', el.type === 'password' ? '\u2022'.repeat(Math.min(orig.length, 24)) : orig);   /* v3: ključ se ne otkriva */
   el.value = '';
   pristineArmed.add(el); el.classList.add('pre-sel');
 }
@@ -4535,11 +4680,11 @@ function openHelpScreen(){
     { t:'Ispravka', c:'Dodir na karticu otvara termin preko celog ekrana. Natpis je u samom polju; polja koja nisu uneta imaju crven okvir. Dole su Slikaj · Galerija · Obriši (termin ide u korpu) · Otkaži · Sačuvaj; Sačuvaj je bled dok ništa nije promenjeno. Dug pritisak (drži prst) na kartici otvara brzi meni: Izmeni ili Obriši.' },
     { t:'Slike vozila', c:'U terminu gore je slika auta. Slikaj otvara kameru (više slika zaredom, pa Gotovo), Galerija bira više slika odjednom. Prevuci prstom za sledeću sliku; dodir na sliku otvara pregled preko celog ekrana (dva prsta uvećavaju, 🗑 briše, „★ Postavi kao profilnu“ bira sliku koja je prva). Slike pripadaju autu, ne terminu: novi termin istog auta (iz Završenog ili „Vrati njega“) ima iste slike, pa oštećenja dodaješ ili brišeš kad se stanje promeni. Na početnom ekranu slika se ne vidi. Slike idu i u rezervnu kopiju.' },
     { t:'Registracija', c:'Polje Registracija je u redu sa prečnikom. Može i glasom („…Golf 7, NS 123 AB“), a po izgovorenoj registraciji aplikacija prepoznaje i stari auto iz Završenog. Kad dodaš slike, a polje je prazno, AI pročita tablicu sa slike i upiše je — proveri je, može da se ispravi. Pretraga nalazi auto po registraciji bez obzira na razmake i crtice („ns123ab“ = „NS 123-AB“) i po onome što je AI video na slikama (boja, felne, oštećenja).' },
-    { t:'Napomena', c:'Napomena je poslednje polje i zauzima ostatak ekrana. Dodir na nju otvara je preko celog ekrana, kao beležnicu: gore ‹ ↶ ↷ Sačuvaj. Sačuvaj ili korak nazad čuvaju napomenu i vraćaju termin (nov termin je čuva kad ga sačuvaš).' },
+    { t:'Napomena', c:'Napomena je poslednje polje i zauzima ostatak ekrana. Dodir na nju otvara je preko celog ekrana, kao beležnicu: gore ‹ ↶ ↷ Sačuvaj. Sačuvaj ili korak nazad čuvaju SAMO napomenu i vraćaju termin; ako si promenio i nešto drugo, dole Sačuvaj ostaje upaljeno dok i to ne sačuvaš (nov termin čuva napomenu kad ga sačuvaš).' },
     { t:'Zauzeti sati', c:'U panelu „U koliko sati?“ sat u kome tog dana već ima zakazan termin je obojen i ima mali broj termina u uglu. Kad izabereš sat, ispod minuta piše ime klijenta koji je u to vreme, a ispod je spisak svih termina tog sata. Zauzeto može i dalje da se izabere (dva auta u isto vreme).' },
     { t:'Telefon i SMS', c:'Na kartici je broj napisan čitljivo (063 880 8260). U terminu: kad je broj upisan, 📞 zove klijenta, a 💬 otvara Poruke sa gotovim podsetnikom („Poštovani, podsećamo Vas na termin za zamenu guma sutra u 12:00. Tire Time“) — samo dodirneš Pošalji. Kad broja nema, 📞 otvara Telefon (da prepišeš broj iz poziva), a 📋 nalepi kopirani broj.' },
     { t:'Hotel za gume', c:'Kvadrat 🏨 Hotel otvara spisak klijenata čije gume čuvaš, po grupama: ⚠ Sporno (crveno, npr. nije došao na zamenu), Čekaju zamenu (narandžasto), ✓ Zamenjeno ove sezone (zeleno) i Na čekanju — bez guma kod nas (klijent ostaje u hotelu, npr. gume bačene, a na leto donosi nove). Gore piše sezona (zimska 1.10.–kraj februara, letnja 1.3.–30.9.) i koliko je zamenjeno. Pretraga po imenu, registraciji, dimenziji ili broju. Dodavanje: ＋ Novi → izaberi klijenta iz termina (ili prazna kartica); ili u otvorenom terminu dugme „🏨 U hotel“ na slici; ili dugi pritisak na termin → 🏨 U hotel za gume. Uklanjanje: u hotel kartici dole 🗑 Ukloni (pita pre brisanja) — kartica ide u korpu (Podešavanja → Korpa), odakle se vraća dugmetom Vrati, sa svim podacima i starim redovima.' },
-    { t:'Hotel kartica', c:'Mesto (broj) je broj koji pokazuje gde su gume. Tu su adresa, dimenzija, felne, cena čuvanja mesečno, brend letnjih i zimskih, od kada su u hotelu, „Kod nas su: letnje / zimske / ništa“ i Status (Aktivan, ⚠ Sporno, Na čekanju — bez guma). Gore su slike auta, iste kao u terminima; dodir otvara pregled preko celog ekrana (slike se dodaju u terminu). Napomena se otvara preko celog ekrana kao u terminu (↶ ↷ Sačuvaj, nazad čuva). Ispod su finansije: zbir hotel, zamena i ukupno, i svi redovi (stari iz Excela i završeni termini). Zamena sezone okreće letnje ↔ zimske.' },
+    { t:'Hotel kartica', c:'Mesto (broj) je broj koji pokazuje gde su gume. Tu su adresa, dimenzija, felne, cena čuvanja mesečno, brend letnjih i zimskih, od kada su u hotelu, „Kod nas su: letnje / zimske / ništa“ i Status (Aktivan, ⚠ Sporno, Na čekanju — bez guma). Gore su slike auta, iste kao u terminima; dodir otvara pregled preko celog ekrana (slike se dodaju u terminu). Polja rade kao u terminu: dodir isprazni polje, a stari tekst se vidi osenčen (kucanje ili diktat upisuje novo, drugi dodir vraća stari tekst za ispravku, Backspace u praznom polju = korak nazad u prethodno polje, strelica na tastaturi = sledeće polje). Napomena se otvara preko celog ekrana kao u terminu (↶ ↷ Sačuvaj; nazad čuva samo napomenu, ostale izmene čekaju Sačuvaj). Ispod su finansije: zbir hotel, zamena i ukupno, i svi redovi (stari iz Excela i završeni termini). Zamena sezone okreće letnje ↔ zimske.' },
     { t:'Termin hotel klijenta', c:'Na kartici na početnom ekranu pored imena piše 🏨 i broj (⚠ ako je sporno). U terminu je traka „Hotel br. … · kod nas: …“ — dodir otvara hotel karticu. Iznos je podeljen: Zamena + Hotel = Ukupno; Hotel se sam predloži (meseci od prošle zamene × cena), a možeš ga promeniti. Kad termin prevučeš u Završeno, klijent prelazi u „zamenjeno ove sezone“, a kod nas se okrene (posle zimske zamene: letnje). Ako termin vratiš iz Završenog, vrati se i to.' },
     { t:'Nesačuvana izmena', c:'Ako u terminu nešto promeniš pa ga zatvoriš bez čuvanja (✕, Otkaži, dodir van ili korak nazad), aplikacija pita „Sačuvati izmene?“: Sačuvaj čuva, Otkaži izmene zatvara termin bez promene. Dodir van prozora ili korak nazad vraća u termin.' },
     { t:'↶ ↷ u terminu', c:'Strelice gore u terminu vraćaju i ponavljaju izmene u celom terminu (polja, napomenu i slike), korak po korak. Korak je pauza u kucanju ili diktatu, ili jedna radnja (vreme, slika). Dodir na strelicu skloni tastaturu — tako mikrofon na tastaturi ostaje ispravan.' },
