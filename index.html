@@ -2167,7 +2167,7 @@ function openNewFromHist(it, datum, vreme){
   if(formCloseFn || !it) return;
   openItemForm(null);
   formDraft = { datum: datum, vreme: vreme, ime: it.ime||'', auto: it.auto||'', dimenzije: it.dimenzije||'', tablica: it.tablica||'', iznos: it.iznos==null ? '' : String(it.iznos), napomena: it.napomena||'', telefon: it.telefon||'', vozilo: it.vozilo||'', slike: vozSlike(it.vozilo) };
-  formReturnAsked = true; formFromHist = true; cdIdx = 0; fhReset();
+  formReturnAsked = true; formFromHist = true; cdIdx = 0; fhReset(); formStart = draftKey();
   renderItemForm();
 }
 /* stari klijent: nov termin, a isti klijent (ime ili telefon) postoji u Završenom → ponuda da se vrati njegov termin */
@@ -2270,22 +2270,33 @@ function apptCardHtml(it, grid, handle){
     '<div class="zc-r2">'+thumb2+'<div class="zc-data">'+ln(l1)+ln(l2)+
     (it.napomena ? '<div class="zc-ln zc-nap med-sub zg-meta" style="-webkit-line-clamp:'+napL+'">'+escapeHtml(it.napomena)+'</div>' : '')+'</div>'+h+'</div></div>';
 }
-/* v36: visina kartice tako da ispod naslova prvog dana stanu tačno 4 (meri se jednom po širini ekrana, kad je ekran na vrhu;
-   traka-podsetnik za kopiju se ne računa); granice 100–150 px */
-let _cardHW = 0;
+/* v36/v37: visina kartice tako da ispod naslova prvog dana stanu tačno 4 — meri se na SVAKOM crtanju ekrana (početni, Završeno,
+   Otkazano imaju svoju), samo kad je ekran na vrhu i ništa ga ne pomera (obaveštenje gore, otvoren prozor, tastatura).
+   v36 je merio jednom pri pokretanju; na Zoranovom telefonu (17.11.) kartice su ostale niže od mesta (prazno ispod 4.). */
+const _cardH = {};
+function cardView(){ return pastOnly ? 'p'+pastKind : (searchOpen ? 's' : 'h'); }
+function applyCardH(){ const v = _cardH[cardView()+innerWidth]; if(v) document.documentElement.style.setProperty('--card-h', v+'px'); }
 function fitCardH(){
-  if(_cardHW === window.innerWidth || window.scrollY > 0 || pastOnly || searchOpen) return;
-  const c = document.querySelector('#app .med-card.zc'), bar = document.querySelector('.bottom-bar');
-  if(!c || !bar) return;
+  applyCardH();
+  if(window.scrollY > 0 || searchOpen || formDraft || overlayStack.length > (pastOnly ? 1 : 0) || document.body.classList.contains('noting')) return;
+  const a = document.activeElement; if(a && /^(INPUT|TEXTAREA)$/.test(a.tagName)) return;
+  const c = document.querySelector('#app .med-card.zc'); if(!c) return;
+  const bar = document.querySelector('.bottom-bar');
+  const bt = (bar && getComputedStyle(bar).display !== 'none') ? bar.getBoundingClientRect().top : window.innerHeight;
   let top = c.getBoundingClientRect().top;
   document.querySelectorAll('#app .backup-reminder-row').forEach(r=>{ if(r.getBoundingClientRect().top < top) top -= r.getBoundingClientRect().height + 8; });
   const gap = parseFloat(getComputedStyle(c).marginBottom) || 9;
-  const h = Math.floor((bar.getBoundingClientRect().top - top - 3*gap - 6) / 4);
-  if(!(h > 0)) return;
-  _cardHW = window.innerWidth;
-  document.documentElement.style.setProperty('--card-h', Math.max(100, Math.min(150, h))+'px');
+  const h = Math.max(100, Math.min(170, Math.floor((bt - top - 3*gap - 6) / 4)));
+  const k = cardView()+innerWidth;
+  if(_cardH[k] === h) return;
+  _cardH[k] = h; applyCardH();
 }
-window.addEventListener('resize', ()=>{ if(_cardHW && _cardHW !== window.innerWidth){ _cardHW = 0; requestAnimationFrame(fitCardH); } });
+window.addEventListener('resize', ()=>requestAnimationFrame(fitCardH));
+/* pisma i obaveštenje gore menjaju visinu zaglavlja posle prvog crtanja → izmeri ponovo kad se smire */
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>requestAnimationFrame(fitCardH));
+new MutationObserver(()=>requestAnimationFrame(fitCardH)).observe(document.body, { attributes:true, attributeFilter:['class'] });
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') requestAnimationFrame(fitCardH); });
+window.addEventListener('scroll', ()=>{ if(window.scrollY === 0) requestAnimationFrame(fitCardH); }, {passive:true});
 function render(){
   normDoneFlags();
   const app = document.getElementById('app');
@@ -2574,7 +2585,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 36; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 37; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -3103,16 +3114,24 @@ function loadFormState(editId){
   formRevive = false; formReturnAsked = false; formFromHist = false;
   cdIdx = 0; tabAiNote = '';
   formOrig = editId ? draftKey() : '';
+  formStart = draftKey();
   fhReset();
 }
 function openItemForm(editId, swapFromFn){
   loadFormState(editId);
   renderItemForm();
   if(!formCloseFn){
-    formCloseFn = ()=>{
+    const fn = formCloseFn = ()=>{
+      /* v37 (Zoran 17.11.): izmena koja nije sačuvana → prozor „Sačuvati izmene?“ (✕, Otkaži, dodir van, korak nazad);
+         termin ostaje otvoren (korak istorije se vraća kad se prethodni završi — afterBackQ) */
+      if(formDirty()){
+        const ask = ()=>{ if(formCloseFn !== fn) return; pushOverlay(fn); askSaveOnClose(); };
+        if(suppressPopstateCount > 0) afterBackQ.push(ask); else ask();
+        return;
+      }
       const b = document.getElementById('formBackdrop');
       if(b) b.remove();
-      formDraft = null; formEditId = null; histStack.length = 0; napFull = false; napCloseFn = null;
+      formDraft = null; formEditId = null; histStack.length = 0; napFull = false; napCloseFn = null; formNoAsk = false;
       document.body.style.overflow='';
       formCloseFn = null;
     };
@@ -3512,7 +3531,7 @@ function openHistItem(id){
   const prev = { id: formEditId, draft: formDraft, ai: formAiWarnings, note: formAiNote, tried: formTried, rev: formRevive, asked: formReturnAsked, fh: formFromHist };
   prev.fn = ()=>{ const i = histStack.indexOf(prev); if(i!==-1) histStack.splice(i,1); if(!formCloseFn) return;
     formEditId = prev.id; formDraft = prev.draft; formAiWarnings = prev.ai; formAiNote = prev.note; formTried = prev.tried; formRevive = prev.rev; formReturnAsked = prev.asked; formFromHist = prev.fh;
-    formAnalyzing = false; renderItemForm(); };
+    formAnalyzing = false; formNoAsk = false; fhReset(); formOrig = (formEditId && !formRevive) ? draftKey(getItem(formEditId) ? Object.assign({}, getItem(formEditId), { slike: vozSlike(getItem(formEditId).vozilo) }) : null) : formOrig; renderItemForm(); };
   histStack.push(prev);
   swapOverlay(homeSheetCloseFn, prev.fn);
   loadFormState(id);
@@ -3532,14 +3551,39 @@ function formEnterKey(e){
 }
 function closeItemForm(){
   if(histStack.length){ closeOverlay(histStack[histStack.length-1].fn); return; }
-  if(formCloseFn){ closeOverlay(formCloseFn); formCloseFn = null; }
+  if(formCloseFn) closeOverlay(formCloseFn);   /* v37: formCloseFn se sam briše kad se termin stvarno zatvori */
+}
+/* v37: da li termin ima nesačuvanu izmenu — postojeći: razlika od sačuvanog; nov (i vraćen iz Završenog): bilo šta upisano */
+let formNoAsk = false, formStart = '';
+function formDirty(){
+  if(!formDraft || formNoAsk) return false;
+  fhPush();
+  if(formEditId && !formRevive) return draftKey() !== formOrig;
+  return formRevive || draftKey() !== formStart;   /* nov termin: promena posle otvaranja (iz Završenog: posle upisanih podataka) */
+}
+let leaveCloseFn = null;
+function askSaveOnClose(){
+  const b = document.createElement('div'); b.className='modal-backdrop'; b.id='leaveBackdrop';
+  b.innerHTML = '<div class="modal" style="border-radius:22px;"><h2 class="serif">Sačuvati izmene?</h2>'+
+    '<p style="font-size:14.5px; color:var(--text); line-height:1.5; margin:0 0 20px;">'+(formEditId && !formRevive ? 'Promenio si termin, a nisi ga sačuvao.' : 'Termin još nije sačuvan.')+'</p>'+
+    '<div class="modal-actions"><button class="cancel-btn" onclick="leaveChoice(false)">Otkaži izmene</button>'+
+    '<button class="save-btn" onclick="leaveChoice(true)">Sačuvaj</button></div></div>';
+  document.body.appendChild(b);
+  b.addEventListener('click',(e)=>{ if(e.target===b) closeOverlay(leaveCloseFn); });   /* dodir van ili korak nazad = nazad u termin */
+  leaveCloseFn = ()=>{ const x = document.getElementById('leaveBackdrop'); if(x) x.remove(); leaveCloseFn = null; };
+  pushOverlay(leaveCloseFn);
+}
+function leaveChoice(save){
+  const go = save ? ()=>saveItemForm() : ()=>{ formNoAsk = true; closeItemForm(); };
+  if(leaveCloseFn){ afterBackQ.push(go); closeOverlay(leaveCloseFn); setTimeout(()=>{ const k = afterBackQ.indexOf(go); if(k!==-1){ afterBackQ.splice(k,1); go(); } }, 400); }
+  else go();
 }
 function saveItemForm(keepOpen, note){
   keepOpen = keepOpen === true;
   if(formAnalyzing) return;
   fhPush();
   /* postojeći termin bez izmene: Sačuvaj samo zatvara (dugme je bledo) */
-  if(formEditId && !formRevive && draftKey() === formOrig){ if(!keepOpen) closeItemForm(); return; }
+  if(formEditId && !formRevive && draftKey() === formOrig){ if(!keepOpen){ formNoAsk = true; closeItemForm(); } return; }
   formTried = true;
   const miss = formMissing();
   if(miss.length){
@@ -3616,6 +3660,7 @@ function doSaveItem(editId, d, keepOpen, note){
     if(!saveFailActive()) showNote(note || ('Izmene sačuvane: '+d.ime));
     return;
   }
+  formNoAsk = true;   /* v37: sačuvano — zatvaranje bez „Sačuvati izmene?“ */
   if(formFromHist && !editId && pastOnly && pastCloseFn && formCloseFn && !histStack.length) closeOverlaysTogether([formCloseFn, pastCloseFn]);   /* v35: nov termin iz Završenog → u zakazane */
   else closeItemForm();
   showNote((d.zavrseno===null && editId ? 'Vraćeno u zakazane: ' : editId ? 'Izmene sačuvane: ' : 'Dodato: ')+d.ime+', '+dayLabel(d.datum)+' u '+d.vreme);
@@ -3639,7 +3684,7 @@ function deleteFromForm(){
     if(!trashAdd(it)){ closeConfirm(); showBanner('Brisanje nije uspelo: na telefonu nema mesta za korpu. Isprazni korpu u Podešavanjima pa probaj ponovo.'); return; }
     items = items.filter(i=>i.id!==id);
     persistItems();
-    closeOverlaysTogether([confirmCloseFn, formFn]); if(!inHist) formCloseFn = null;
+    formNoAsk = true; closeOverlaysTogether([confirmCloseFn, formFn]); if(!inHist) formCloseFn = null;
     render();
     showBanner('Termin „'+(it.ime||'')+'“ je u korpi.', 'info');
   };
@@ -3944,6 +3989,7 @@ function openHelpScreen(){
     { t:'Slike vozila', c:'U terminu gore je slika auta. Slikaj otvara kameru (više slika zaredom, pa Gotovo), Galerija bira više slika odjednom. Prevuci prstom za sledeću sliku; dodir na sliku otvara pregled preko celog ekrana (dva prsta uvećavaju, 🗑 briše, „★ Postavi kao profilnu“ bira sliku koja je prva). Slike pripadaju autu, ne terminu: novi termin istog auta (iz Završenog ili „Vrati njega“) ima iste slike, pa oštećenja dodaješ ili brišeš kad se stanje promeni. Na početnom ekranu slika se ne vidi. Slike idu i u rezervnu kopiju.' },
     { t:'Registracija', c:'Polje Registracija je u redu sa prečnikom. Kad dodaš slike, a polje je prazno, AI pročita tablicu sa slike i upiše je — proveri je, može da se ispravi. Pretraga nalazi auto po registraciji bez obzira na razmake i crtice („ns123ab“ = „NS 123-AB“) i po onome što je AI video na slikama (boja, felne, oštećenja).' },
     { t:'Napomena', c:'Napomena je poslednje polje i zauzima ostatak ekrana. Dodir na nju otvara je preko celog ekrana, kao beležnicu: gore ‹ ↶ ↷ Sačuvaj. Sačuvaj ili korak nazad čuvaju napomenu i vraćaju termin (nov termin je čuva kad ga sačuvaš).' },
+    { t:'Nesačuvana izmena', c:'Ako u terminu nešto promeniš pa ga zatvoriš bez čuvanja (✕, Otkaži, dodir van ili korak nazad), aplikacija pita „Sačuvati izmene?“: Sačuvaj čuva, Otkaži izmene zatvara termin bez promene. Dodir van prozora ili korak nazad vraća u termin.' },
     { t:'↶ ↷ u terminu', c:'Strelice gore u terminu vraćaju i ponavljaju izmene u celom terminu (polja, napomenu i slike), korak po korak. Korak je pauza u kucanju ili diktatu, ili jedna radnja (vreme, slika). Dodir na strelicu skloni tastaturu — tako mikrofon na tastaturi ostaje ispravan.' },
     { t:'Više auta', c:'Ako klijent iz Završenog ima više auta, pri novom terminu („Klijent već postoji“) biraš koji auto vraćaš — sa njegovim slikama i registracijom. Kad glasom kažeš i auto („Petar, Golf…“), aplikacija sama izabere taj auto.' },
     { t:'Kad nešto nedostaje', c:'Datum, vreme i ime su obavezni. Ako AI ne prepozna neko od njih, otvori se izmena sa onim što je razumeo; šta nije uneto ima crven okvir i oznaku „nije uneto“. Termin se čuva tek kad dopuniš obavezno.' },
