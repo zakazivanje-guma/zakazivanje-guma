@@ -3465,6 +3465,7 @@ function formWarningsHtml(){
 function formDupClient(d){
   d = d || formDraft;
   const o = formEditId ? getItem(formEditId) : null;
+  if(o && isDone(o) && !formRevive) return null;   /* v39: izmena zapisa iz Završenog/Otkazanog ne upozorava (v33: „Završeno ne upozorava“) */
   return findDupClient(d.ime, d.telefon, formEditId, (o && !isDone(o)) ? o : null);
 }
 function refreshFormWarnings(){
