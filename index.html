@@ -997,6 +997,53 @@ body.noting .vw-screen, body.noting .cam-screen{ top:var(--note-h); }
 .hl-s{ font-size:12px; font-weight:700; padding:3px 8px; border-radius:8px; flex:none; }
 .hl-s.z{ background:#DCE8F5; color:#1F4E80; } .hl-s.l{ background:#F6E7C8; color:#7A5410; } .hl-s.x{ background:var(--bg-elevated); color:var(--text-dim); }
 .sp-tag{ font-size:11.5px; font-weight:800; color:#fff; background:#C62828; border-radius:7px; padding:1px 6px; margin-left:4px; vertical-align:2px; }
+
+:root, [data-theme]{ --pearl:color-mix(in srgb, var(--bg-card) 72%, var(--bg));
+  --sez-l:color-mix(in srgb, #E8B04A 26%, var(--bg-card)); --sez-l-line:color-mix(in srgb, #E8B04A 55%, var(--line)); --sez-l-t:color-mix(in srgb, #9A6508 75%, var(--text));
+  --sez-l-bar:#D9A030; --sez-l-row:color-mix(in srgb, #E8B04A 12%, var(--bg-card));
+  --sez-z:color-mix(in srgb, #5B8FC9 22%, var(--bg-card)); --sez-z-line:color-mix(in srgb, #5B8FC9 50%, var(--line)); --sez-z-t:color-mix(in srgb, #1F4E80 75%, var(--text));
+  --sez-z-bar:#4A7FB5; --sez-z-row:color-mix(in srgb, #5B8FC9 10%, var(--bg-card)); }
+/* v44 hotel: spisak u temi početnog ekrana, veća oznaka 🏨, leto/zima u kartici i finansijama */
+.modal.form-full.hl{ background:var(--bg); }
+.hl .ff-head{ border-bottom:1px solid var(--line); }
+.hl .hl-new{ background:var(--bg-card); border-color:var(--line); color:var(--green-deep); }
+.hl .hs-season{ background:var(--bg-card); border:1px solid var(--line); border-radius:14px; padding:9px 12px; margin:0 0 10px; }
+.hl .hs-sec{ margin:14px 0 8px; }
+.hl .hs-sec.wait{ color:#9A4A16; } .hl .hs-sec.ok{ color:var(--green-deep); } .hl .hs-sec.sp{ color:#C62828; } .hl .hs-sec.out{ color:var(--text-dim); }
+.hl-grp{ position:relative; }
+.hl .hl-row{ position:relative; z-index:1; touch-action:pan-y; border:none; border-left:6px solid #E08A3C; border-radius:20px; box-shadow:var(--shadow-card); margin:0 0 10px; padding:12px 13px; }
+.hl .hl-row.sw-anim{ transition:transform .2s ease; }
+.hl .hl-row.ok{ border-left-color:var(--green-deep); } .hl .hl-row.sp{ border-left-color:#C62828; } .hl .hl-row.out{ border-left-color:var(--line); }
+.hl .hl-n{ width:48px; height:48px; font-size:23px; background:var(--amber); color:#fff; }
+.hl .hl-row.ok .hl-n{ background:var(--green-deep); color:#fff; } .hl .hl-row.sp .hl-n{ background:#C62828; color:#fff; } .hl .hl-row.out .hl-n{ background:var(--bg-elevated); color:var(--text-dim); }
+.htag{ font-size:17px !important; font-weight:800; padding:3px 11px 3px 8px !important; border-radius:11px !important; background:var(--amber) !important; color:#fff !important; border:none !important; display:inline-flex; align-items:center; gap:5px; line-height:22px; }
+.htag .hti{ font-size:18px; }
+.htag.sp{ background:#C62828 !important; color:#fff !important; }
+.htag.st{ background:var(--bg-elevated) !important; color:var(--text-dim) !important; }
+.hk .zf-row > .field{ flex:1 1 0; min-width:0; }
+.hk .hk-sez{ border-radius:16px; padding:6px 7px 1px; margin:0 0 8px; border:1px solid; }
+.hk .hk-sez.l{ background:var(--sez-l); border-color:var(--sez-l-line); } .hk .hk-sez.z{ background:var(--sez-z); border-color:var(--sez-z-line); }
+.hk .hk-sez-t{ font-size:12.5px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; margin:0 4px 5px; }
+.hk .hk-sez.l .hk-sez-t{ color:var(--sez-l-t); } .hk .hk-sez.z .hk-sez-t{ color:var(--sez-z-t); }
+.hk .hk-sez .field{ background:var(--bg-card); }
+.hk .fel{ display:flex; gap:4px; padding-top:4px; }
+.hk .hk-fel .fel{ margin:0 -6px; }
+.hk .fel button{ flex:1; min-width:0; padding:5px 0; border-radius:9px; border:1px solid var(--line); background:var(--bg-card); color:var(--text); font:inherit; font-size:13px; cursor:pointer; white-space:nowrap; letter-spacing:-.01em; }
+.hk .fel button.on{ background:var(--green-deep); border-color:var(--green-deep); color:#fff; font-weight:700; }
+.hk .hf-sez{ display:flex; align-items:center; gap:6px; font-size:13px; font-weight:800; letter-spacing:.03em; margin:12px 2px 6px; padding:6px 10px; border-radius:11px; }
+.hk .hf-sez b{ margin-left:auto; font-size:14px; }
+.hk .hf-sez.z{ background:var(--sez-z); color:var(--sez-z-t); } .hk .hf-sez.l{ background:var(--sez-l); color:var(--sez-l-t); }
+.hk .hf-row.z{ border-left-color:var(--sez-z-bar); background:var(--sez-z-row); } .hk .hf-row.l{ border-left-color:var(--sez-l-bar); background:var(--sez-l-row); }
+.hk .hf-row .field{ background:var(--bg-card); }
+
+/* v44 (Zoran 17.11.): ekrani hotela kao početni ekran — bež pozadina, polja biserno bela (topla, kremasta) */
+.modal.form-full.hk{ background:var(--bg); }
+.hk .field, .hk .hk-sez .field, .hk .hf-row .field, .hk .hk-sum div{ background:var(--pearl); border-color:var(--line); }
+.hk .seg button, .hk .fel button{ background:var(--pearl); }
+
+
+.hk .hk-sez.l{ background:var(--sez-l); } .hk .hk-sez.z{ background:var(--sez-z); }
+.hl .hs-season, .hl .hl-q, .hl .hl-new{ background:var(--pearl); }
 </style>
 </head>
 <body>
@@ -1463,7 +1510,7 @@ function handleImportFile(fileInput){
 function applyBackup(backup){
   items = backup.items || [];
   persistItems();
-  if(Array.isArray(backup.hotel)){ hotel = backup.hotel; persistHotel(); localStorage.setItem('zg:hotelUvoz1', localStorage.getItem('zg:hotelUvoz1') || new Date().toISOString()); }   /* v40; starija kopija bez hotela ga ne briše */
+  if(Array.isArray(backup.hotel)){ hotel = backup.hotel; hotel.forEach(hotelMigr); persistHotel(); localStorage.setItem('zg:hotelUvoz1', localStorage.getItem('zg:hotelUvoz1') || new Date().toISOString()); }   /* v40; starija kopija bez hotela ga ne briše */
   /* v36: slike vozila iz kopije idu u IndexedDB; vozila kojih nema u kopiji (a nisu u korpi) se brišu */
   const voz = Array.isArray(backup.vozila) ? backup.vozila.filter(x=>x && x.id && Array.isArray(x.slike) && x.slike.length) : [];
   const keep = new Set(voz.map(x=>x.id)), used = vozilaUpotreba();
@@ -1904,8 +1951,25 @@ async function callGeminiOpisSlika(pics, auto){
 let hotel = [];
 function loadHotel(){
   try{ const v = JSON.parse(localStorage.getItem('zg:hotel')||'[]'); hotel = Array.isArray(v) ? v : []; }catch(e){ hotel = []; }
-  let ch = false; hotel.forEach(h=>{ if(h.status==='vracene' || h.status==='otpisane'){ h.status = 'cekanje'; ch = true; } }); if(ch) persistHotel();
+  let ch = false; hotel.forEach(h=>{ if(h.status==='vracene' || h.status==='otpisane'){ h.status = 'cekanje'; ch = true; } if(hotelMigr(h)) ch = true; }); if(ch) persistHotel();
 }
+/* v44 (Zoran 17.11.): letnje i zimske posebno — dimenzija, brend, felna (alu / čelik / ništa); stara polja dimenzija + felne se prenose jednom */
+function hotelMigr(h){
+  if(!h || h.dimL !== undefined) return false;
+  const d = String(h.dimenzija||'').trim(), f = String(h.felne||'');
+  const fel = x=> /\balu/i.test(x) ? 'alu' : /(č|c)eli/i.test(x) ? 'celik' : '';
+  const br = x=> String(x||'').replace(/\s*(\bna\s+)?(\balu\S*|(č|c)eli\S*)\s+feln\S*\s*$/i, '').trim();
+  let fl = fel(h.letnje), fz = fel(h.zimske);
+  if(!fl && /alu\S*\s+letn|letn\S*\s+alu/i.test(f)) fl = 'alu';
+  if(!fz && /zimsk\S*\s+(č|c)eli|(č|c)eli\S*\s+zimsk/i.test(f)) fz = 'celik';
+  if(!fl && !fz && fel(f)){ fl = fz = fel(f); }
+  h.dimL = d; h.dimZ = d; h.felnaL = fl; h.felnaZ = fz; h.letnje = br(h.letnje); h.zimske = br(h.zimske);
+  delete h.dimenzija; delete h.felne;
+  return true;
+}
+function hotelDim(h){ const a = h.dimL||'', b = h.dimZ||''; return a===b ? a : [a && '☀️ '+a, b && '❄️ '+b].filter(Boolean).join(' '); }
+/* dimenzija guma koje se montiraju (one koje su kod nas) */
+function hotelDimNa(h){ return (h.kod==='letnje' ? h.dimL : h.dimZ) || h.dimL || h.dimZ || ''; }
 function persistHotel(){ return persistChecked('zg:hotel', JSON.stringify(hotel)); }
 /* v41 (Zoran 17.11.): Vraćene/Otpisane → „Na čekanju“ (klijent ostaje u hotelu bez guma, npr. Pavel: kupiće nove na leto) */
 const H_STATUS = { aktivan:'Aktivan', sporno:'⚠ Sporno', cekanje:'Na čekanju' };
@@ -1967,14 +2031,14 @@ function hotelVratiZavrsetak(it){
 }
 function hotelTagHtml(it){
   const h = hotelOf(it); if(!h) return '';
-  return '<span class="htag'+(h.status==='sporno'?' sp':'')+(hotelAktivan(h)?'':' st')+'" title="'+(hotelAktivan(h)?'Hotel za gume':'Hotel — na čekanju, bez guma')+'">🏨 '+escapeHtml(h.mesto||'?')+(h.status==='sporno'?' ⚠':'')+'</span>';
+  return '<span class="htag'+(h.status==='sporno'?' sp':'')+(hotelAktivan(h)?'':' st')+'" title="'+(hotelAktivan(h)?'Hotel za gume':'Hotel — na čekanju, bez guma')+'"><span class="hti">🏨</span> '+escapeHtml(h.mesto||'?')+(h.status==='sporno'?' ⚠':'')+'</span>';
 }
 /* traka u terminu */
 function hotelBandHtml(){
   const h = formDraft ? hotelOf(formDraft) : null; if(!h) return '';
   const kod = h.kod ? h.kod : 'ništa';
   return '<button type="button" class="hband'+(h.status==='sporno'?' sp':'')+(hotelAktivan(h)?'':' out')+'" onclick="openHotelCard(\''+h.id+'\')">🏨 <span><b>Hotel br. '+escapeHtml(h.mesto||'?')+'</b>'+
-    (hotelAktivan(h) ? ' · kod nas: <b>'+kod+'</b>' : ' · '+escapeHtml(H_STATUS[h.status]))+(h.status==='sporno'?' · <b class="sp">⚠ sporno</b>':'')+(h.dimenzija?' · '+escapeHtml(h.dimenzija):'')+'</span><span class="go">›</span></button>';
+    (hotelAktivan(h) ? ' · kod nas: <b>'+kod+'</b>' : ' · '+escapeHtml(H_STATUS[h.status]))+(h.status==='sporno'?' · <b class="sp">⚠ sporno</b>':'')+(hotelDimNa(h)?' · '+escapeHtml(hotelDimNa(h)):'')+'</span><span class="go">›</span></button>';
 }
 /* ---------- uvoz 7 klijenata sa Zoranovih Excel kartica (17.11.2026), jednom; preskače ako registracija već postoji ---------- */
 const HOTEL_UVOZ1 = [{"mesto": "1", "ime": "Anton Lozvinov", "adresa": "Janka Veslinovića 13/18", "telefon": "062 937 7674", "auto": "VW Passat", "tablica": "NS 691-CT", "dimenzija": "215/65 R17", "letnje": "", "zimske": "Tigar", "felne": "ne", "od": "2024-11-20", "cena": 600, "napomena": "", "redovi": [["2024-11-20", 3600, null, ""], ["2025-04-28", 3000, 3600, "5 meseci"], ["2025-11-25", 4200, 3000, "7 meseci · tri točka, pokvarila se demonterka"], ["2026-05-06", 3600, 4000, "6 meseci"]], "kod": "zimske", "status": "aktivan", "statusDatum": ""}, {"mesto": "2", "ime": "Pavel Kovač", "adresa": "Gorana Maletića br.45", "telefon": "063 880 8260", "auto": "BMW X1", "tablica": "NS 539-ST", "dimenzija": "225/45 R19", "letnje": "", "zimske": "", "felne": "ne", "od": "2024-12-30", "cena": 600, "napomena": "letnje gume bačene po nalogu klijenta 17.11.2026. (potrošene)", "redovi": [["2024-12-30", null, 4800, ""], ["2025-04-23", 2400, 4800, "4 meseca"], ["2025-11-10", 4200, 5600, "7 meseci"], ["2026-05-27", 3600, 5600, "6 meseci"]], "kod": "", "status": "cekanje", "statusDatum": "2026-11-17"}, {"mesto": "3", "ime": "Jovan Stričević", "adresa": "Alaska br.14", "telefon": "064 276 9285", "auto": "Peugeot 2008", "tablica": "NS 818-XA", "dimenzija": "215/60 R17", "letnje": "", "zimske": "", "felne": "ne", "od": "2025-11-24", "cena": 600, "napomena": "", "redovi": [["2025-11-24", null, 4000, ""], ["2025-11-24", null, 2000, "podmazivanje glavčine"], ["2026-05-18", 3600, 4000, "6 meseci"]], "kod": "zimske", "status": "aktivan", "statusDatum": ""}, {"mesto": "4", "ime": "Ilija Prosenica", "adresa": "Balzakova br.63", "telefon": "069 206 0643", "auto": "Opel Astra", "tablica": "IN 087-IM", "dimenzija": "195/65 R15", "letnje": "", "zimske": "", "felne": "da — čelične", "od": "2025-12-14", "cena": 600, "napomena": "nije došao na letnju zamenu iako su slata upozorenja", "redovi": [["2025-12-14", null, 2800, "zamena + balansiranje"]], "kod": "letnje", "status": "sporno", "statusDatum": "2026-11-17"}, {"mesto": "5", "ime": "Stevan Debeljača", "adresa": "Seljačkih buna br.17", "telefon": "065 511 6679", "auto": "Mercedes A klasa", "tablica": "NS 859-GC", "dimenzija": "185/65 R15", "letnje": "Goodyear na alu felni", "zimske": "Snošus na čeličnoj felni", "felne": "da", "od": "2026-02-24", "cena": 600, "napomena": "", "redovi": [["2026-02-24", null, 1800, "nagađam za cenu zamene"], ["2026-06-02", 2000, 3000, "3,5 meseca · sa balansiranjem"]], "kod": "zimske", "status": "aktivan", "statusDatum": ""}, {"mesto": "6", "ime": "Darko Babić", "adresa": "Somborska br.17", "telefon": "061 309 5249", "auto": "Opel Meriva", "tablica": "NS 536-NE", "dimenzija": "185/65 R15", "letnje": "", "zimske": "", "felne": "ne", "od": "2026-04-07", "cena": 600, "napomena": "", "redovi": [["2026-04-07", null, 3200, "prva zamena, nagađam"]], "kod": "zimske", "status": "aktivan", "statusDatum": ""}, {"mesto": "7", "ime": "Aleksandar Petrović", "adresa": "Kamendinska br.9", "telefon": "069 500 8145", "auto": "Passat limuzina", "tablica": "RU 106-NL", "dimenzija": "205/55 R16", "letnje": "alu felna", "zimske": "čelična felna", "felne": "da — alu letnja / zimska čelik", "od": "2026-05-05", "cena": 600, "napomena": "", "redovi": [["2026-05-05", null, 3000, "prva zamena, montirano sa alu felnom letnja + balans"]], "kod": "zimske", "status": "aktivan", "statusDatum": ""}];
@@ -1986,6 +2050,7 @@ function hotelUvoz(){
     hotel.push({ id: uid('h'), vozilo: uid('v'), mesto:k.mesto, ime:k.ime, telefon:k.telefon, auto:k.auto, tablica:k.tablica, adresa:k.adresa,
       cena:k.cena, dimenzija:k.dimenzija, letnje:k.letnje, zimske:k.zimske, felne:k.felne, od:k.od, kod:k.kod, status:k.status, statusDatum:k.statusDatum||'',
       napomena:k.napomena||'', redovi:k.redovi.map(r=>({ datum:r[0], hotel:r[1]||0, zamena:r[2]||0, napomena:r[3]||'' })), napravljeno: new Date().toISOString() });
+    hotelMigr(hotel[hotel.length-1]);
     n++;
   });
   if(persistHotel()) localStorage.setItem('zg:hotelUvoz1', new Date().toISOString());
@@ -2004,32 +2069,37 @@ function openHotelList(){
 function closeHotelList(){ if(hlCloseFn) closeOverlay(hlCloseFn); }
 function hlRowHtml(h, cls, sub){
   const kod = h.kod || 'ništa', kc = h.kod==='zimske' ? 'z' : h.kod==='letnje' ? 'l' : 'x';
-  return '<button type="button" class="hl-row '+cls+'" onclick="openHotelCard(\''+h.id+'\')"><span class="hl-n">'+escapeHtml(h.mesto||'?')+'</span><span class="t"><b>'+escapeHtml(h.ime||'Bez imena')+
-    (h.status==='sporno' ? ' <span class="sp-tag">⚠ sporno</span>' : '')+'</b><span class="hl-l">'+escapeHtml([h.auto, h.tablica, h.dimenzija].filter(Boolean).join(' · '))+'</span><span class="hl-l">'+escapeHtml(sub)+'</span></span>'+
+  return '<button type="button" class="hl-row '+cls+'" data-id="'+h.id+'" onclick="openHotelCard(\''+h.id+'\')"><span class="hl-n">'+escapeHtml(h.mesto||'?')+'</span><span class="t"><b>'+escapeHtml(h.ime||'Bez imena')+
+    (h.status==='sporno' ? ' <span class="sp-tag">⚠ sporno</span>' : '')+'</b><span class="hl-l">'+escapeHtml([h.auto, h.tablica, hotelDim(h)].filter(Boolean).join(' · '))+'</span><span class="hl-l">'+escapeHtml(sub)+'</span></span>'+
     '<span class="hl-s '+kc+'">'+kod+'</span></button>';
 }
 function renderHotelList(){
   const b = document.getElementById('hlBackdrop'); if(!b) return;
   const q = foldAll(hlQuery.trim()), qc = compactKey(q);
-  const hit = h=> !q || foldAll([h.mesto, h.ime, h.auto, h.tablica, h.dimenzija, h.telefon, h.napomena].join(' ')).includes(q) || (qc && compactKey(foldAll([h.tablica, h.dimenzija].join(' '))).includes(qc));
+  const hit = h=> !q || foldAll([h.mesto, h.ime, h.auto, h.tablica, h.dimL, h.dimZ, h.letnje, h.zimske, h.telefon, h.adresa, h.napomena].join(' ')).includes(q) || (qc && compactKey(foldAll([h.tablica, h.dimL, h.dimZ].join(' '))).includes(qc));
   const byN = (a,c)=> (parseInt(a.mesto,10)||9999) - (parseInt(c.mesto,10)||9999) || String(a.mesto).localeCompare(String(c.mesto));
   const L = hotel.filter(hit).sort(byN), akt = hotel.filter(hotelAktivan), s = sezona();
   const sp = L.filter(h=>h.status==='sporno'), ok = L.filter(h=>h.status==='aktivan' && hotelZamenjeno(h)), wait = L.filter(h=>h.status==='aktivan' && !hotelZamenjeno(h)), out = L.filter(h=>!hotelAktivan(h));   /* na čekanju */
   const zam = akt.filter(h=>h.status==='aktivan' && hotelZamenjeno(h)).length;
   const last = h=>{ const z = hotelZadnjaZamena(h); return z ? dmyShort(z) : '—'; };
-  const sec = (cls, t, l, f)=> l.length ? '<div class="hs-sec '+cls+'">'+t+' ('+l.length+')</div>'+l.map(f).join('') : '';
+  const sec = (cls, t, l, f)=> l.length ? '<div class="group-header hs-sec '+cls+'">'+t+' · '+l.length+'</div><div class="hl-grp">'+l.map(f).join('')+'</div>' : '';
   const body = b.querySelector('.hl-list');
   const html = sec('sp', '⚠ SPORNO', sp, h=>hlRowHtml(h, 'sp', (h.napomena||'nije došao na zamenu')+' · poslednja '+last(h)))+
     sec('wait', 'ČEKAJU ZAMENU', wait, h=>hlRowHtml(h, '', 'poslednja zamena '+last(h)))+
     sec('ok', '✓ ZAMENJENO OVE SEZONE', ok, h=>hlRowHtml(h, 'ok', 'zamenjeno '+last(h)))+
     sec('out', 'NA ČEKANJU — BEZ GUMA KOD NAS', out, h=>hlRowHtml(h, 'out', 'od '+(h.statusDatum?dmyShort(h.statusDatum):'—')+(h.napomena?' · '+h.napomena:'')))+
     (L.length ? '' : '<div class="hs-empty">'+(hotel.length ? 'Nema rezultata.' : 'Još nema hotel klijenata. Dodaj: dugi pritisak na termin → 🏨 U hotel za gume, ili ＋ Novi gore.')+'</div>');
-  if(body){ body.innerHTML = html; return; }
+  if(body){ body.innerHTML = html; wireHotelList(); return; }
   b.innerHTML = '<div class="modal form-full zf hl"><div class="ff-head"><h2 class="serif">🏨 Hotel za gume ('+akt.length+')</h2>'+
     '<button type="button" class="hl-new" onclick="openHotelPick()">＋ Novi</button><button class="modal-close-x" onclick="closeHotelList()" aria-label="Zatvori">✕</button></div>'+
     '<div class="ff-body hl-body"><div class="hs-season">'+s.ic+' '+s.naziv+' · zamenjeno <b>'+zam+'</b> od '+akt.length+'</div>'+
     '<input class="hl-q" id="hlQ" type="search" autocomplete="off" placeholder="Traži: ime, registracija, dimenzija, broj" oninput="hlQuery=this.value; renderHotelList()">'+
     '<div class="hl-list">'+html+'</div></div></div>';
+  wireHotelList();
+}
+/* v44 (Zoran 17.11.): prevlačenje ulevo → crveno dugme → potvrda → kartica u korpu (kao termin) */
+function wireHotelList(){
+  document.querySelectorAll('#hlBackdrop .hl-row').forEach(r=>swipeToDelete(r, null, false, false, ()=>removeHotelCard(r.dataset.id)));
 }
 /* v41: ＋ Novi — izbor klijenta iz zakazanih i završenih termina (jedan red po autu, najnoviji gore) ili prazna kartica */
 let hpCloseFn = null, hpQuery = '';
@@ -2068,21 +2138,22 @@ function hotelPickGo(id){
   if(hpCloseFn){ afterBackQ.push(go); closeOverlay(hpCloseFn); setTimeout(()=>{ const k = afterBackQ.indexOf(go); if(k!==-1){ afterBackQ.splice(k,1); go(); } }, 400); } else go();
 }
 /* v41: ukloni klijenta iz hotela (potvrda) → ista korpa kao termini (Podešavanja → Korpa, zadati broj dana); Vrati vraća celu karticu */
-function removeHotelCard(){
-  if(!hkId) { hkNoAsk = true; closeHotelCard(); return; }
-  const h = hotel.find(x=>x.id===hkId); if(!h) return;
+function removeHotelCard(id){
+  id = id || hkId;
+  if(!id) { hkNoAsk = true; closeHotelCard(); return; }
+  const h = hotel.find(x=>x.id===id); if(!h) return;
   showConfirm('Ukloniti '+(h.ime||'klijenta')+' (br. '+h.mesto+') iz hotela? Kartica ide u korpu (Podešavanja → Korpa) i odatle može da se vrati; termini i slike ostaju.', ()=>{
     if(!trashAddHotel(h)){ closeConfirm(); showBanner('Uklanjanje nije uspelo: na telefonu nema mesta za korpu. Isprazni korpu u Podešavanjima pa probaj ponovo.'); return; }
     hotel = hotel.filter(x=>x!==h);
     if(!persistHotel()){ hotel.push(h); setTrash(getTrash().filter(x=>x.id!==h.id)); return; }
-    hkNoAsk = true; closeHotelCard(); render(); if(document.getElementById('hlBackdrop')) renderHotelList();
+    if(hkId === h.id){ hkNoAsk = true; closeHotelCard(); } render(); if(document.getElementById('hlBackdrop')) renderHotelList();
     if(formDraft && document.getElementById('formBackdrop')) renderItemForm();
     showNote((h.ime||'Klijent')+' je uklonjen iz hotela (u korpi).');
   }, 'Ukloni');
 }
 /* ---------- hotel kartica (izmena) — isti način kao termin: natpis u polju, napomena-beležnica, ↶ ↷, „Sačuvati izmene?“ ---------- */
 let hkDraft = null, hkId = null, hkOrig = '', hkCloseFn = null, hkNoAsk = false, hkHist = null, hkTimer = null, hkNapFull = false, hkNapCloseFn = null;
-const HK_FIELDS = ['mesto','ime','telefon','auto','tablica','adresa','cena','dimenzija','felne','letnje','zimske','od','kod','status','napomena'];
+const HK_FIELDS = ['mesto','ime','telefon','auto','tablica','adresa','cena','dimL','letnje','felnaL','dimZ','zimske','felnaZ','od','kod','status','napomena'];
 /* v43: ključ i koraci obuhvataju i slike (potpis) i redove finansija */
 function hkFinKey(f){ return (f||[]).map(r=>[r.tid||'', r.datum||'', normIznos(r.hotel)||0, normIznos(r.zamena)||0, String(r.napomena||'').trim()].join('|')).join('¦'); }
 function hkKey(d){ d = d || hkDraft; return JSON.stringify(HK_FIELDS.map(k=>String(d[k]==null?'':d[k]).trim()).concat([hkFinKey(d.fin), picSig(d.slike)])); }
@@ -2096,7 +2167,7 @@ function openHotelCard(id, fromTermin){
   hkId = h ? h.id : null;
   hkDraft = h ? Object.assign({}, h, { cena: String(h.cena||'') })
     : { mesto: String(hotelNextMesto()), ime: src ? src.ime||'' : '', telefon: src ? src.telefon||'' : '', auto: src ? src.auto||'' : '', tablica: src ? src.tablica||'' : '',
-        adresa:'', cena: String(hotelCena()), dimenzija:'', felne:'', letnje:'', zimske:'', od: todayISO(), kod: sezona().tip==='zimska' ? 'letnje' : 'zimske', status:'aktivan', napomena:'', vozilo: src ? src.vozilo||'' : '' };
+        adresa:'', cena: String(hotelCena()), dimL:'', dimZ:'', felnaL:'', felnaZ:'', letnje:'', zimske:'', od: todayISO(), kod: sezona().tip==='zimska' ? 'letnje' : 'zimske', status:'aktivan', napomena:'', vozilo: src ? src.vozilo||'' : '' };
   hkDraft._src = src ? src.id : '';
   hkDraft.fin = hkFinOf(h);
   hkDraft.slike = vozSlike(hkVozilo()).slice();
@@ -2152,7 +2223,7 @@ function hkBar(){
 }
 /* v42 (Zoran 17.11.): polja hotel kartice rade kao u terminu — modul gboard-backspace (prazno + stari tekst osenčen, Backspace =
    korak nazad u prethodno polje), strelica tastature = sledeće polje, posle poslednjeg → Sačuvaj */
-const HK_ORDER = ['mesto','ime','auto','tablica','telefon','adresa','dimenzija','felne','cena','letnje','zimske'];
+const HK_ORDER = ['ime','adresa','telefon','mesto','auto','tablica','dimL','letnje','dimZ','zimske','cena'];
 function wireHkFields(){
   const els = HK_ORDER.map(k=>document.getElementById('hk_'+k));
   els.forEach((el,i)=>{
@@ -2205,19 +2276,21 @@ function renderHotelCard(){
   const F = 'autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next"';
   const FB = (k, l, st, type, extra)=> '<div class="field" data-k="'+k+'"'+(st?' style="'+st+'"':'')+' onclick="zfFocus(event,this)"><label>'+l+'</label><input id="hk_'+k+'" type="'+(type||'text')+'" '+F+' value="'+escapeHtml(d[k]==null?'':d[k])+'" oninput="hkSet(\''+k+'\', this.value)"'+(extra||'')+'></div>';
   const seg = (k, opts)=> '<div class="seg">'+opts.map(o=>'<button type="button" class="'+(String(d[k]||'')===o[0]?'on'+(o[0]==='sporno'?' sp':''):'')+'" onclick="hkSeg(\''+k+'\',\''+o[0]+'\')">'+o[1]+'</button>').join('')+'</div>';
+  const fel = k=> '<div class="field hk-fel"><label>Felna</label><div class="fel">'+[['alu','Alu'],['celik','Čelik']].map(o=>'<button type="button" class="'+(d[k]===o[0]?'on':'')+'" onclick="hkSeg(\''+k+'\', hkDraft.'+k+'===\''+o[0]+'\' ? \'\' : \''+o[0]+'\')">'+(d[k]===o[0]?'✓':'')+o[1]+'</button>').join('')+'</div></div>';
   const UR = '<button type="button" class="cd-undo f-undo" onclick="hkUndo(-1)" aria-label="Poništi">↶</button><button type="button" class="cd-undo f-redo" onclick="hkUndo(1)" aria-label="Ponovi">↷</button>';
   const fin = '<div class="sec">FINANSIJE</div><div class="hk-sum" id="hkSum">'+hkSumHtml()+'</div>'+hkFinHtml();
   const keep = b.querySelector('.ff-body') ? b.querySelector('.ff-body').scrollTop : 0;
   b.innerHTML = '<div class="modal form-full zf hk'+(hkNapFull?' nap-full':'')+'">'+
     '<div class="ff-head"><h2 class="serif">🏨 '+(h ? 'Hotel br. '+escapeHtml(h.mesto||'?') : 'Nov hotel klijent')+'</h2>'+UR+'<button class="modal-close-x" onclick="closeHotelCard()" aria-label="Zatvori">✕</button></div>'+
     '<div class="ff-body zf-body">'+hkPicsHtml()+
-    '<div class="zf-row">'+FB('mesto','Mesto (broj)','flex:0 0 26%','text',' inputmode="numeric"')+FB('ime','Ime i prezime')+'</div>'+
-    '<div class="zf-row">'+FB('auto','Auto')+FB('tablica','Registracija','flex:0 0 40%')+'</div>'+
-    '<div class="zf-row">'+FB('telefon','Telefon','flex:0 0 44%','tel',' inputmode="tel"')+FB('adresa','Adresa')+'</div>'+
-    '<div class="zf-row">'+FB('dimenzija','Dimenzija')+FB('felne','Felne','flex:0 0 30%')+FB('cena','Cena/mes.','flex:0 0 24%','text',' inputmode="numeric"')+'</div>'+
-    '<div class="zf-row">'+FB('letnje','Letnje (brend)')+FB('zimske','Zimske (brend)')+'</div>'+
-    '<div class="zf-row">'+FB('od','U hotelu od','flex:0 0 40%','date')+'<div class="field"><label>Kod nas su</label>'+seg('kod',[['letnje','Letnje'],['zimske','Zimske'],['','Ništa']])+'</div></div>'+
-    '<div class="field"><label>Status</label>'+seg('status',[['aktivan','Aktivan'],['sporno','⚠ Sporno'],['cekanje','Na čekanju (bez guma)']])+'</div>'+
+    '<div class="zf-row">'+FB('ime','Ime i prezime')+FB('adresa','Adresa')+'</div>'+
+    '<div class="zf-row">'+FB('telefon','Telefon','','tel',' inputmode="tel"')+FB('mesto','Mesto (broj)','','text',' inputmode="numeric"')+'</div>'+
+    '<div class="zf-row">'+FB('auto','Auto')+FB('tablica','Registracija')+'</div>'+
+    '<div class="hk-sez l"><div class="hk-sez-t">☀️ Letnje</div><div class="zf-row">'+FB('dimL','Dimenzija')+FB('letnje','Brend')+fel('felnaL')+'</div></div>'+
+    '<div class="hk-sez z"><div class="hk-sez-t">❄️ Zimske</div><div class="zf-row">'+FB('dimZ','Dimenzija')+FB('zimske','Brend')+fel('felnaZ')+'</div></div>'+
+    '<div class="field"><label>Status</label>'+seg('status',[['aktivan','Aktivan'],['sporno','⚠ Sporno'],['cekanje','Na čekanju']])+'</div>'+
+    '<div class="field"><label>Kod nas su</label>'+seg('kod',[['letnje','☀️ Letnje'],['zimske','❄️ Zimske'],['','Ništa']])+'</div>'+
+    '<div class="zf-row">'+FB('od','U hotelu od','','date')+FB('cena','Cena mesečno','','text',' inputmode="numeric"')+'</div>'+
     '<div class="field zf-nap hk-nap" data-k="napomena"><div class="cd-lbl"><button type="button" class="nap-back" onclick="collapseHkNap()" aria-label="Nazad">'+HOME_IC.back+'</button><label>Napomena hotela</label>'+
       '<span class="cd-fullbar">'+UR+'<button type="button" class="cd-done" id="hkNapSave" onclick="collapseHkNap()">Sačuvaj</button></span></div>'+
       '<textarea id="hkNap" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" onfocus="expandHkNap()" onclick="expandHkNap()" oninput="hkSet(\'napomena\', this.value)">'+escapeHtml(d.napomena||'')+'</textarea></div>'+
@@ -2225,7 +2298,6 @@ function renderHotelCard(){
     '<div class="modal-actions ff-foot cd-foot">'+
     '<button class="home-sq" onclick="hkZakazi()"><span class="sq-box">📅</span>Zakaži</button>'+
     '<button class="home-sq" onclick="hkSwapSeason()"><span class="sq-box">🔄</span>Zamena sezone</button>'+
-    (h ? '<button class="home-sq cd-delsq" onclick="removeHotelCard()"><span class="sq-box">🗑</span>Ukloni</button>' : '')+
     '<button class="home-sq" onclick="closeHotelCard()"><span class="sq-box">✕</span>Otkaži</button>'+
     '<button class="home-sq cd-save" id="hkSave" onclick="saveHotelCard()"><span class="sq-box">✓</span>Sačuvaj</button></div></div>';
   if(keep){ const nb = b.querySelector('.ff-body'); if(nb) nb.scrollTop = keep; }
@@ -2265,7 +2337,12 @@ function hkFinHtml(){
   const f = hkDraft.fin || [];
   const F = 'autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next"';
   const fld = (i, k, l, st, attr)=> '<div class="field" style="'+(st||'')+'" onclick="zfFocus(event,this)"><label>'+l+'</label><input id="hf_'+i+'_'+k+'" '+(attr||'type="text" '+F)+' value="'+escapeHtml(k==='hotel'||k==='zamena' ? fmtBroj(normIznos(f[i][k])) : (f[i][k]||''))+'" oninput="hkFinSet('+i+',\''+k+'\', this.value)"></div>';
-  return '<div class="hf-list" id="hfList">'+f.map((r,i)=>'<div class="hf-row'+(r.tid?' hf-t':'')+'" data-i="'+i+'">'+
+  /* v44: redovi po sezonama — naslov sezone sa zbirom, zima plavo, leto žuto */
+  const sz = r=> sezona(/^\d{4}-\d{2}-\d{2}$/.test(r.datum||'') ? r.datum : todayISO());
+  const sum = n=> f.filter(r=>sz(r).naziv===n).reduce((a,r)=>a+(normIznos(r.hotel)||0)+(normIznos(r.zamena)||0), 0);
+  let prev = '';
+  const head = r=>{ const z = sz(r); if(z.naziv===prev) return ''; prev = z.naziv; return '<div class="hf-sez '+(z.tip==='zimska'?'z':'l')+'">'+z.ic+' '+escapeHtml(z.naziv)+'<b>'+fmtIznos(sum(z.naziv))+'</b></div>'; };
+  return '<div class="hf-list" id="hfList">'+f.map((r,i)=>head(r)+'<div class="hf-row '+(sz(r).tip==='zimska'?'z':'l')+(r.tid?' hf-t':'')+'" data-i="'+i+'">'+
       (r.tid ? '<div class="hf-tag">📅 iz termina — izmena menja i termin</div>' : '')+
       '<div class="zf-row">'+fld(i,'datum','Datum','flex:0 0 38%','type="date"')+fld(i,'hotel','Hotel','',''+'type="text" inputmode="numeric" '+F)+fld(i,'zamena','Zamena','','type="text" inputmode="numeric" '+F)+'</div>'+
       '<div class="zf-row">'+fld(i,'napomena','Napomena')+'</div></div>').join('')+
@@ -2327,13 +2404,13 @@ function saveHotelCard(keepOpen, note){
   const dup = hotel.find(h=>h.id!==hkId && hotelAktivan(h) && String(h.mesto).trim()===String(d.mesto).trim());
   if(dup && hotelAktivan({status:d.status}) && !keepOpen && !hkDupOk){ showConfirm('Mesto '+d.mesto+' već ima '+(dup.ime||'drugi klijent')+'. Ipak sačuvati?', ()=>{ hkDupOk = true; saveHotelCard(); hkDupOk = false; }, 'Ipak sačuvaj'); return; }
   const v = { mesto:String(d.mesto).trim(), ime:String(d.ime).trim(), telefon:String(d.telefon||'').trim(), auto:String(d.auto||'').trim(), tablica:normTab(d.tablica),
-    adresa:String(d.adresa||'').trim(), cena: normIznos(d.cena)||0, dimenzija:String(d.dimenzija||'').trim(), felne:String(d.felne||'').trim(), letnje:String(d.letnje||'').trim(),
+    adresa:String(d.adresa||'').trim(), cena: normIznos(d.cena)||0, dimL:String(d.dimL||'').trim(), dimZ:String(d.dimZ||'').trim(), felnaL:d.felnaL||'', felnaZ:d.felnaZ||'', letnje:String(d.letnje||'').trim(),
     zimske:String(d.zimske||'').trim(), od: d.od||'', kod: d.kod||'', status: d.status||'aktivan', napomena:String(d.napomena||'').trim() };
   /* v43: stari redovi (bez termina) iz polja; redovi termina se upisuju u termine posle uspešnog čuvanja kartice */
   v.redovi = (d.fin||[]).filter(r=>!r.tid).map(r=>({ datum: /^\d{4}-\d{2}-\d{2}$/.test(r.datum||'') ? r.datum : todayISO(), hotel: normIznos(r.hotel)||0, zamena: normIznos(r.zamena)||0, napomena: String(r.napomena||'').trim() }));
   const pics = (d.slike||[]).slice();
   let h = hkId ? hotel.find(x=>x.id===hkId) : null; const old = h ? JSON.stringify(h) : null;
-  if(h){ if(h.status !== v.status) v.statusDatum = todayISO(); if(!h.vozilo){ const hv = hkVozilo() || (pics.length ? uid('v') : ''); if(hv) v.vozilo = hv; } Object.assign(h, v); }
+  if(h){ if(h.status !== v.status) v.statusDatum = todayISO(); delete h.dimenzija; delete h.felne; if(!h.vozilo){ const hv = hkVozilo() || (pics.length ? uid('v') : ''); if(hv) v.vozilo = hv; } Object.assign(h, v); }
   else {
     const src = d._src ? getItem(d._src) : null;
     const vid = (src && src.vozilo) || d.vozilo || uid('v');
@@ -2369,7 +2446,7 @@ function hkZakazi(){
   if(!hkId || hkKey() !== hkOrig){ saveHotelCard(true); if(!hkId || hkKey() !== hkOrig) return; }
   const h = hotel.find(x=>x.id===hkId); if(!h) return;
   if(formCloseFn){ showNote('Termin je već otvoren — zatvori ga pa zakaži iz kartice.', {warn:true}); return; }
-  const r = rimOf(h.dimenzija);
+  const r = rimOf(hotelDimNa(h));
   const src = { ime:h.ime||'', auto:h.auto||'', dimenzije: r ? 'R'+r : '', tablica:h.tablica||'', telefon:h.telefon||'', vozilo:h.vozilo||'', iznos:null, napomena:'' };
   hkNoAsk = true; closeHotelCard();
   hzSrc = src; openHzDate();
@@ -3208,7 +3285,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 43; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 44; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -4807,8 +4884,8 @@ function openHelpScreen(){
     { t:'Napomena', c:'Napomena je poslednje polje i zauzima ostatak ekrana. Dodir na nju otvara je preko celog ekrana, kao beležnicu: gore ‹ ↶ ↷ Sačuvaj. Sačuvaj ili korak nazad čuvaju SAMO napomenu i vraćaju termin; ako si promenio i nešto drugo, dole Sačuvaj ostaje upaljeno dok i to ne sačuvaš (nov termin čuva napomenu kad ga sačuvaš).' },
     { t:'Zauzeti sati', c:'U panelu „U koliko sati?“ sat u kome tog dana već ima zakazan termin je obojen i ima mali broj termina u uglu. Kad izabereš sat, ispod minuta piše ime klijenta koji je u to vreme, a ispod je spisak svih termina tog sata. Zauzeto može i dalje da se izabere (dva auta u isto vreme).' },
     { t:'Telefon i SMS', c:'Na kartici je broj napisan čitljivo (063 880 8260). U terminu: kad je broj upisan, 📞 zove klijenta, a 💬 otvara Poruke sa gotovim podsetnikom („Poštovani, podsećamo Vas na termin za zamenu guma sutra u 12:00. Tire Time“) — samo dodirneš Pošalji. Kad broja nema, 📞 otvara Telefon (da prepišeš broj iz poziva), a 📋 nalepi kopirani broj.' },
-    { t:'Hotel za gume', c:'Kvadrat 🏨 Hotel otvara spisak klijenata čije gume čuvaš, po grupama: ⚠ Sporno (crveno, npr. nije došao na zamenu), Čekaju zamenu (narandžasto), ✓ Zamenjeno ove sezone (zeleno) i Na čekanju — bez guma kod nas (klijent ostaje u hotelu, npr. gume bačene, a na leto donosi nove). Gore piše sezona (zimska 1.10.–kraj februara, letnja 1.3.–30.9.) i koliko je zamenjeno. Pretraga po imenu, registraciji, dimenziji ili broju. Dodavanje: ＋ Novi → izaberi klijenta iz termina (ili prazna kartica); ili u otvorenom terminu dugme „🏨 U hotel“ na slici; ili dugi pritisak na termin → 🏨 U hotel za gume. Uklanjanje: u hotel kartici dole 🗑 Ukloni (pita pre brisanja) — kartica ide u korpu (Podešavanja → Korpa), odakle se vraća dugmetom Vrati, sa svim podacima i starim redovima.' },
-    { t:'Hotel kartica', c:'Mesto (broj) je broj koji pokazuje gde su gume. Tu su adresa, dimenzija, felne, cena čuvanja mesečno, brend letnjih i zimskih, od kada su u hotelu, „Kod nas su: letnje / zimske / ništa“ i Status (Aktivan, ⚠ Sporno, Na čekanju — bez guma). Gore su slike auta, iste kao u terminima: 📷 Slikaj i 🖼️ Galerija dodaju slike direktno u kartici, dodir na sliku otvara pregled (★ profilna, 🗑 briše); sve se čuva dugmetom Sačuvaj. Polja rade kao u terminu: dodir isprazni polje, a stari tekst se vidi osenčen (kucanje ili diktat upisuje novo, drugi dodir vraća stari tekst za ispravku, Backspace u praznom polju = korak nazad u prethodno polje, strelica na tastaturi = sledeće polje). Napomena se otvara preko celog ekrana kao u terminu (↶ ↷ Sačuvaj; nazad čuva samo napomenu, ostale izmene čekaju Sačuvaj). Ispod su finansije: zbir hotel, zamena i ukupno, i svaki red kao polja Datum, Hotel, Zamena i Napomena — dodir na polje i menjaš direktno, zbir se odmah preračuna; ＋ Dodaj red dodaje nov red na vrh; prevuci red ulevo → Izbriši (↶ vraća, konačno tek na Sačuvaj). Red sa zelenom ivicom „📅 iz termina“ je završen termin: izmena tu menja i taj termin (iznos = hotel + zamena), a briše se u Završenom. Dole: 📅 Zakaži (kartica se sačuva, pa kalendar i sat, pa nov termin sa podacima kartice — upisuje se na Sačuvaj), Zamena sezone (letnje ↔ zimske), Ukloni, Otkaži, Sačuvaj.' },
+    { t:'Hotel za gume', c:'Kvadrat 🏨 Hotel otvara spisak klijenata čije gume čuvaš, po grupama: ⚠ Sporno (crveno, npr. nije došao na zamenu), Čekaju zamenu (narandžasto), ✓ Zamenjeno ove sezone (zeleno) i Na čekanju — bez guma kod nas (klijent ostaje u hotelu, npr. gume bačene, a na leto donosi nove). Gore piše sezona (zimska 1.10.–kraj februara, letnja 1.3.–30.9.) i koliko je zamenjeno. Broj u kvadratu je mesto gde su gume. Pretraga po imenu, registraciji, dimenziji, brendu, adresi ili broju. Dodavanje: ＋ Novi → izaberi klijenta iz termina (ili prazna kartica); ili u otvorenom terminu dugme „🏨 U hotel“ na slici; ili dugi pritisak na termin → 🏨 U hotel za gume. Uklanjanje: prevuci klijenta u spisku ulevo → Izbriši (pita pre brisanja) — kartica ide u korpu (Podešavanja → Korpa), odakle se vraća dugmetom Vrati, sa svim podacima i starim redovima.' },
+    { t:'Hotel kartica', c:'Redom: Ime i prezime | Adresa, Telefon | Mesto (broj gde su gume), Auto | Registracija; zatim žuti okvir ☀️ Letnje i plavi ❄️ Zimske — svaki sa Dimenzija | Brend | Felna (dodir na Alu ili Čelik označi kvačicom, ponovni dodir skida; bez oznake = bez felne); pa Status (Aktivan, ⚠ Sporno, Na čekanju — bez guma), „Kod nas su: letnje / zimske / ništa“, U hotelu od | Cena mesečno i Napomena. Gore su slike auta, iste kao u terminima: 📷 Slikaj i 🖼️ Galerija dodaju slike direktno u kartici, dodir na sliku otvara pregled (★ profilna, 🗑 briše); sve se čuva dugmetom Sačuvaj. Polja rade kao u terminu: dodir isprazni polje, a stari tekst se vidi osenčen (kucanje ili diktat upisuje novo, drugi dodir vraća stari tekst za ispravku, Backspace u praznom polju = korak nazad u prethodno polje, strelica na tastaturi = sledeće polje). Napomena se otvara preko celog ekrana kao u terminu (↶ ↷ Sačuvaj; nazad čuva samo napomenu, ostale izmene čekaju Sačuvaj). Ispod su finansije: zbir hotel, zamena i ukupno; redovi su po sezonama (traka sa nazivom sezone i zbirom; zima plavo, leto žuto, po datumu reda), i svaki red kao polja Datum, Hotel, Zamena i Napomena — dodir na polje i menjaš direktno, zbir se odmah preračuna; ＋ Dodaj red dodaje nov red na vrh; prevuci red ulevo → Izbriši (↶ vraća, konačno tek na Sačuvaj). Red sa oznakom „📅 iz termina“ je završen termin: izmena tu menja i taj termin (iznos = hotel + zamena), a briše se u Završenom. Dole: 📅 Zakaži (kartica se sačuva, pa kalendar i sat, pa nov termin sa podacima kartice — upisuje se na Sačuvaj), Zamena sezone (letnje ↔ zimske; red u finansije upisuješ sam), Otkaži, Sačuvaj.' },
     { t:'Termin hotel klijenta', c:'Na kartici na početnom ekranu pored imena piše 🏨 i broj (⚠ ako je sporno). U terminu je traka „Hotel br. … · kod nas: …“ — dodir otvara hotel karticu. Iznos je podeljen: Zamena + Hotel = Ukupno; Hotel se sam predloži (meseci od prošle zamene × cena), a možeš ga promeniti. Kad termin prevučeš u Završeno, klijent prelazi u „zamenjeno ove sezone“, a kod nas se okrene (posle zimske zamene: letnje). Ako termin vratiš iz Završenog, vrati se i to.' },
     { t:'Nesačuvana izmena', c:'Ako u terminu nešto promeniš pa ga zatvoriš bez čuvanja (✕, Otkaži, dodir van ili korak nazad), aplikacija pita „Sačuvati izmene?“: Sačuvaj čuva, Otkaži izmene zatvara termin bez promene. Dodir van prozora ili korak nazad vraća u termin.' },
     { t:'↶ ↷ u terminu', c:'Strelice gore u terminu vraćaju i ponavljaju izmene u celom terminu (polja, napomenu i slike), korak po korak. Korak je pauza u kucanju ili diktatu, ili jedna radnja (vreme, slika). Dodir na strelicu skloni tastaturu — tako mikrofon na tastaturi ostaje ispravan.' },
