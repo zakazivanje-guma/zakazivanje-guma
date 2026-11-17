@@ -960,6 +960,19 @@ body.noting .vw-screen, body.noting .cam-screen{ top:var(--note-h); }
 .hk .hk-sum small{ display:block; font-size:11px; font-weight:700; color:var(--text-dim); }
 .hk .hk-sum b{ font-size:16px; } .hk .hk-sum .uk b{ color:var(--green-deep); }
 .hk .hk-t{ width:100%; border-collapse:collapse; font-size:13.5px; }
+/* v43: finansije sa poljima, Slikaj/Galerija u polju slike */
+.hk .hf-list{ position:relative; }
+.hk .hf-row{ position:relative; z-index:1; touch-action:pan-y; background:var(--bg-card); border:1px solid var(--line); border-left:5px solid var(--chip-line, var(--line)); border-radius:14px; padding:8px 8px 2px; margin:0 0 10px; }
+.hk .hf-row.sw-anim{ transition:transform .2s ease; }
+.hk .hf-row.hf-t{ border-left-color:var(--green-deep); }
+.hk .hf-tag{ font-size:12px; font-weight:700; color:var(--green-deep); margin:0 2px 6px; }
+.hk .hf-row .zf-row{ margin-bottom:6px; }
+.hk .hf-add{ width:100%; height:46px; border-radius:12px; border:1.5px dashed var(--green-deep); background:transparent; color:var(--green-deep); font:inherit; font-weight:700; font-size:15px; cursor:pointer; margin-bottom:8px; }
+.hk .hk-pic{ position:relative; }
+.hk .hk-pic0{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; }
+.hk .hk-picbtn{ display:flex; gap:10px; }
+.hk .hk-pic:not(.hk-pic0) .hk-picbtn{ position:absolute; left:10px; bottom:10px; z-index:3; }
+.hk .hk-picbtn button{ font:inherit; font-weight:700; font-size:15px; padding:9px 14px; border-radius:12px; border:1.5px solid var(--green-deep); background:var(--bg-card); color:var(--green-deep); cursor:pointer; }
 .hk .hk-t td, .hk .hk-t th{ padding:5px 4px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
 .hk .hk-t th{ font-size:11px; color:var(--text-dim); } .hk .hk-t .n{ text-align:right; white-space:nowrap; }
 .hk .zf-body{ overflow-y:auto; }
@@ -1584,7 +1597,12 @@ async function shrinkPic(src, max, q){
   return c.toDataURL('image/jpeg', q || PIC_Q);
 }
 function blobToPic(blob){ const u = URL.createObjectURL(blob); return shrinkPic(u).finally(()=>URL.revokeObjectURL(u)); }
+/* v43 (Zoran 17.11.): Slikaj / Galerija / pregled rade i u hotel kartici — slike idu u karticu koja je otvorena (hotel kartica je iznad termina) */
+function picHK(){ return !!(hkDraft && document.getElementById('hkBackdrop')); }
+function picArr(){ if(picHK()) return hkDraft.slike || (hkDraft.slike = []); return formDraft ? formDraft.slike : []; }
+function picAfter(){ if(picHK()){ hkPush(); renderHotelCard(); } else { fhPush(); renderItemForm(); } }
 function addPicsToDraft(arr){
+  if(picHK()){ if(!arr.length) return; const before = hkDraft.slike.length; hkDraft.slike = hkDraft.slike.concat(arr); hkPicIdx = before; hkPush(); renderHotelCard(); return; }
   if(!formDraft || !arr.length) return;
   const before = formDraft.slike.length;
   formDraft.slike = formDraft.slike.concat(arr);
@@ -1665,8 +1683,8 @@ async function camTake(){
 /* pregled slika preko celog ekrana: prevlačenje = sledeća/prethodna, dodir na sliku = nazad bez promene */
 let vwCloseFn = null, vwIdx = 0, cdIdx = 0, vwStrip = null;
 function openViewer(i){
-  if(!formDraft || !formDraft.slike.length) return;
-  vwIdx = Math.max(0, Math.min(i||0, formDraft.slike.length-1));
+  if(!picArr().length) return;
+  vwIdx = Math.max(0, Math.min(i||0, picArr().length-1));
   const el = document.createElement('div'); el.className = 'vw-screen'; el.id = 'vwScreen';
   document.body.appendChild(el);
   renderViewer();
@@ -1674,17 +1692,17 @@ function openViewer(i){
   pushOverlay(vwCloseFn);
 }
 function renderViewer(){
-  const el = document.getElementById('vwScreen'); if(!el || !formDraft) return;
-  const n = formDraft.slike.length;
+  const el = document.getElementById('vwScreen'); if(!el || !picArr().length) return;
+  const n = picArr().length;
   el.innerHTML = '<div class="vw-top"><span style="width:42px"></span><b id="vwCnt"></b><button class="cam-btn vw-del" onclick="viewerDelete()" aria-label="Obriši sliku">🗑</button></div>'+
-    '<div class="vw-img">'+stripHtml(formDraft.slike, 'contain')+'</div>'+
+    '<div class="vw-img">'+stripHtml(picArr(), 'contain')+'</div>'+
     '<div class="vw-bot"><button class="vw-prof" id="vwProf" onclick="viewerSetProfile()"></button>'+
     '<div class="vw-hint">'+(n>1 ? '‹ prevuci › · ' : '')+'dva prsta: uvećaj i okreni · dodir na sliku = nazad</div></div>';
   vwStrip = makeStrip(el.querySelector('.sw-strip'), { idx:vwIdx, zoom:true, onIdx:(i)=>{ vwIdx = i; viewerBar(); }, onTap:closeViewer });
   viewerBar();
 }
 function viewerBar(){
-  const n = formDraft ? formDraft.slike.length : 0, prof = vwIdx === 0;
+  const n = picArr().length, prof = vwIdx === 0;
   const c = document.getElementById('vwCnt'); if(c) c.textContent = (vwIdx+1)+' / '+n;
   const b = document.getElementById('vwProf'); if(b){ b.disabled = prof; b.textContent = prof ? '★ Profilna slika' : '★ Postavi kao profilnu'; }
 }
@@ -1692,10 +1710,11 @@ function viewerGo(d){ if(vwStrip) vwStrip.go(vwIdx + d); }
 function closeViewer(){ if(vwCloseFn) closeOverlay(vwCloseFn); }
 /* „Postavi kao profilnu“ odmah čuva postojeći termin (kao Gde sam ostavio v5); pregled ostaje otvoren na toj slici (★) */
 function viewerSetProfile(){
-  if(!formDraft || vwIdx === 0) return;
-  const p = formDraft.slike.splice(vwIdx, 1)[0];
-  formDraft.slike.unshift(p);
-  vwIdx = 0; cdIdx = 0;
+  if(!picArr().length || vwIdx === 0) return;
+  const A = picArr(), p = A.splice(vwIdx, 1)[0];
+  A.unshift(p);
+  vwIdx = 0; cdIdx = 0; hkPicIdx = 0;
+  if(picHK()){ hkPush(); renderViewer(); renderHotelCard(); return; }   /* hotel kartica: čuva se dugmetom Sačuvaj */
   fhPush(); renderViewer(); renderItemForm();
   if(formEditId) saveItemForm(true, 'Profilna slika je sačuvana.');
   else showNote('Profilna slika je izabrana — sačuvaće se sa terminom.');
@@ -1792,11 +1811,11 @@ function makeStrip(box, o){
 }
 function viewerDelete(){
   showConfirm('Obrisati ovu sliku vozila? (Konačno tek kad pritisneš Sačuvaj.)', ()=>{
-    if(!formDraft) return;
-    formDraft.slike.splice(vwIdx, 1); fhPush();
-    if(!formDraft.slike.length){ closeViewer(); renderItemForm(); return; }
-    vwIdx = Math.min(vwIdx, formDraft.slike.length-1);
-    renderViewer(); renderItemForm();
+    const A = picArr(); if(!A.length) return;
+    A.splice(vwIdx, 1); picAfter();
+    if(!A.length){ closeViewer(); return; }
+    vwIdx = Math.min(vwIdx, A.length-1);
+    renderViewer();
   }, 'Da, obriši');
 }
 
@@ -2064,8 +2083,13 @@ function removeHotelCard(){
 /* ---------- hotel kartica (izmena) — isti način kao termin: natpis u polju, napomena-beležnica, ↶ ↷, „Sačuvati izmene?“ ---------- */
 let hkDraft = null, hkId = null, hkOrig = '', hkCloseFn = null, hkNoAsk = false, hkHist = null, hkTimer = null, hkNapFull = false, hkNapCloseFn = null;
 const HK_FIELDS = ['mesto','ime','telefon','auto','tablica','adresa','cena','dimenzija','felne','letnje','zimske','od','kod','status','napomena'];
-function hkKey(d){ d = d || hkDraft; return JSON.stringify(HK_FIELDS.map(k=>String(d[k]==null?'':d[k]).trim())); }
-function hkSnap(){ const o = {}; HK_FIELDS.forEach(k=>o[k] = hkDraft[k]==null ? '' : String(hkDraft[k])); return o; }
+/* v43: ključ i koraci obuhvataju i slike (potpis) i redove finansija */
+function hkFinKey(f){ return (f||[]).map(r=>[r.tid||'', r.datum||'', normIznos(r.hotel)||0, normIznos(r.zamena)||0, String(r.napomena||'').trim()].join('|')).join('¦'); }
+function hkKey(d){ d = d || hkDraft; return JSON.stringify(HK_FIELDS.map(k=>String(d[k]==null?'':d[k]).trim()).concat([hkFinKey(d.fin), picSig(d.slike)])); }
+function hkSnap(){ const o = {}; HK_FIELDS.forEach(k=>o[k] = hkDraft[k]==null ? '' : String(hkDraft[k])); o.fin = JSON.parse(JSON.stringify(hkDraft.fin||[])); o.slike = (hkDraft.slike||[]).slice(); return o; }
+function hkSnapKey(o){ return JSON.stringify(HK_FIELDS.map(k=>o[k])) + hkFinKey(o.fin) + picSig(o.slike); }
+/* redovi finansija za izmenu: stari (Excel/ručni) + završeni termini (tid) — termin red je JEDAN zapis sa terminom */
+function hkFinOf(h){ return h ? hotelRedovi(h).map(r=>({ tid: r.tid||'', datum: r.datum||'', hotel: r.hotel ? String(r.hotel) : '', zamena: r.zamena ? String(r.zamena) : '', napomena: r.napomena||'' })) : []; }
 function openHotelCard(id, fromTermin){
   const h = id ? hotel.find(x=>x.id===id) : null;
   const src = fromTermin || null;
@@ -2074,6 +2098,8 @@ function openHotelCard(id, fromTermin){
     : { mesto: String(hotelNextMesto()), ime: src ? src.ime||'' : '', telefon: src ? src.telefon||'' : '', auto: src ? src.auto||'' : '', tablica: src ? src.tablica||'' : '',
         adresa:'', cena: String(hotelCena()), dimenzija:'', felne:'', letnje:'', zimske:'', od: todayISO(), kod: sezona().tip==='zimska' ? 'letnje' : 'zimske', status:'aktivan', napomena:'', vozilo: src ? src.vozilo||'' : '' };
   hkDraft._src = src ? src.id : '';
+  hkDraft.fin = hkFinOf(h);
+  hkDraft.slike = vozSlike(hkVozilo()).slice();
   hkOrig = h ? hkKey() : '';
   hkHist = { s:[hkSnap()], i:0 }; hkNoAsk = false; hkNapFull = false;
   const b = document.createElement('div'); b.className='modal-backdrop'; b.id='hkBackdrop';
@@ -2108,14 +2134,14 @@ function hkLeave(save){
 function hkSet(k, v){ hkDraft[k] = v; clearTimeout(hkTimer); hkTimer = setTimeout(hkPush, 800); hkBar(); }
 function hkPush(){
   clearTimeout(hkTimer); hkTimer = null; if(!hkHist || !hkDraft) return;
-  const o = hkSnap(); if(JSON.stringify(o) === JSON.stringify(hkHist.s[hkHist.i])){ hkBar(); return; }
+  const o = hkSnap(); if(hkSnapKey(o) === hkSnapKey(hkHist.s[hkHist.i])){ hkBar(); return; }
   hkHist.s = hkHist.s.slice(0, hkHist.i+1); hkHist.s.push(o); hkHist.i = hkHist.s.length-1; hkBar();
 }
 function hkUndo(d){
   hkPush(); if(!hkHist) return;
   const j = hkHist.i + d; if(j < 0 || j >= hkHist.s.length) return;
   const a = document.activeElement; if(a && a.blur && a.closest && a.closest('#hkBackdrop')) a.blur();
-  hkHist.i = j; Object.assign(hkDraft, hkHist.s[j]); renderHotelCard();
+  hkHist.i = j; const sn = hkHist.s[j]; Object.assign(hkDraft, sn, { fin: JSON.parse(JSON.stringify(sn.fin||[])), slike: (sn.slike||[]).slice() }); renderHotelCard();
 }
 function hkBar(){
   const p = !!hkTimer;
@@ -2180,11 +2206,7 @@ function renderHotelCard(){
   const FB = (k, l, st, type, extra)=> '<div class="field" data-k="'+k+'"'+(st?' style="'+st+'"':'')+' onclick="zfFocus(event,this)"><label>'+l+'</label><input id="hk_'+k+'" type="'+(type||'text')+'" '+F+' value="'+escapeHtml(d[k]==null?'':d[k])+'" oninput="hkSet(\''+k+'\', this.value)"'+(extra||'')+'></div>';
   const seg = (k, opts)=> '<div class="seg">'+opts.map(o=>'<button type="button" class="'+(String(d[k]||'')===o[0]?'on'+(o[0]==='sporno'?' sp':''):'')+'" onclick="hkSeg(\''+k+'\',\''+o[0]+'\')">'+o[1]+'</button>').join('')+'</div>';
   const UR = '<button type="button" class="cd-undo f-undo" onclick="hkUndo(-1)" aria-label="Poništi">↶</button><button type="button" class="cd-undo f-redo" onclick="hkUndo(1)" aria-label="Ponovi">↷</button>';
-  const R = h ? hotelRedovi(h) : [];
-  const H = R.reduce((a,r)=>a+r.hotel,0), Z = R.reduce((a,r)=>a+r.zamena,0);
-  const din = n=> n ? fmtIznos(n) : '';
-  const fin = h ? '<div class="sec">FINANSIJE</div><div class="hk-sum"><div><small>Hotel</small><b>'+fmtIznos(H||0)+'</b></div><div><small>Zamena</small><b>'+fmtIznos(Z||0)+'</b></div><div class="uk"><small>Ukupno</small><b>'+fmtIznos(H+Z||0)+'</b></div></div>'+
-    (R.length ? '<table class="hk-t"><tr><th>Datum</th><th class="n">Hotel</th><th class="n">Zamena</th><th>Napomena</th></tr>'+R.map(r=>'<tr><td>'+escapeHtml(dmyShort(r.datum))+'</td><td class="n">'+din(r.hotel)+'</td><td class="n">'+din(r.zamena)+'</td><td>'+escapeHtml(r.napomena)+'</td></tr>').join('')+'</table>' : '<div class="hs-empty">Još nema plaćanja.</div>') : '';
+  const fin = '<div class="sec">FINANSIJE</div><div class="hk-sum" id="hkSum">'+hkSumHtml()+'</div>'+hkFinHtml();
   const keep = b.querySelector('.ff-body') ? b.querySelector('.ff-body').scrollTop : 0;
   b.innerHTML = '<div class="modal form-full zf hk'+(hkNapFull?' nap-full':'')+'">'+
     '<div class="ff-head"><h2 class="serif">🏨 '+(h ? 'Hotel br. '+escapeHtml(h.mesto||'?') : 'Nov hotel klijent')+'</h2>'+UR+'<button class="modal-close-x" onclick="closeHotelCard()" aria-label="Zatvori">✕</button></div>'+
@@ -2201,15 +2223,16 @@ function renderHotelCard(){
       '<textarea id="hkNap" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" onfocus="expandHkNap()" onclick="expandHkNap()" oninput="hkSet(\'napomena\', this.value)">'+escapeHtml(d.napomena||'')+'</textarea></div>'+
     fin+'</div>'+
     '<div class="modal-actions ff-foot cd-foot">'+
+    '<button class="home-sq" onclick="hkZakazi()"><span class="sq-box">📅</span>Zakaži</button>'+
     '<button class="home-sq" onclick="hkSwapSeason()"><span class="sq-box">🔄</span>Zamena sezone</button>'+
     (h ? '<button class="home-sq cd-delsq" onclick="removeHotelCard()"><span class="sq-box">🗑</span>Ukloni</button>' : '')+
     '<button class="home-sq" onclick="closeHotelCard()"><span class="sq-box">✕</span>Otkaži</button>'+
     '<button class="home-sq cd-save" id="hkSave" onclick="saveHotelCard()"><span class="sq-box">✓</span>Sačuvaj</button></div></div>';
   if(keep){ const nb = b.querySelector('.ff-body'); if(nb) nb.scrollTop = keep; }
-  hkBar(); wireHkFields();
+  hkBar(); wireHkFields(); wireHkFin();
   const cb = document.getElementById('hkPic'), pics = hkPics();
-  if(cb && pics.length) makeStrip(cb.querySelector('.sw-strip'), { idx:0, zoom:false,
-    onIdx:(i)=>{ hkPicIdx = i; const c = document.getElementById('hkCnt'); if(c) c.textContent = (i+1)+' / '+pics.length; }, onTap:()=>openRoViewer(hkPics(), hkPicIdx) });
+  if(cb && pics.length) makeStrip(cb.querySelector('.sw-strip'), { idx:Math.min(hkPicIdx, pics.length-1), zoom:false,
+    onIdx:(i)=>{ hkPicIdx = i; const c = document.getElementById('hkCnt'); if(c) c.textContent = (i+1)+' / '+pics.length; }, onTap:()=>openViewer(hkPicIdx) });
 }
 /* v41 (Zoran 17.11.): slike auta u hotel kartici — iste kao u terminima (slike pripadaju vozilu); dodir = pregled preko celog ekrana.
    Slike se dodaju u terminu (Slikaj / Galerija). */
@@ -2222,11 +2245,64 @@ function hkVozilo(){
   if(h){ const t = items.filter(x=> x.vozilo && SLIKE.get(x.vozilo) && hotelOf(x)===h).sort((a,b)=> String(b.datum).localeCompare(String(a.datum)))[0]; if(t) return t.vozilo; }
   return vid || '';
 }
-function hkPics(){ return vozSlike(hkVozilo()); }
+function hkPics(){ return hkDraft ? (hkDraft.slike || []) : []; }
+/* v43: Slikaj / Galerija u polju slike (kao u terminu: kamera u aplikaciji, galerija više slika); dodir na sliku = pregled sa ★ i 🗑 */
+const HK_PICBTN = '<span class="hk-picbtn"><button type="button" onclick="event.stopPropagation(); openCamera()">📷 Slikaj</button><button type="button" onclick="event.stopPropagation(); pickGallery()">🖼️ Galerija</button></span>';
 function hkPicsHtml(){
-  const p = hkPics(); hkPicIdx = 0;
-  if(!p.length) return '<div class="cd-big zf-pic zf-pic-empty hk-pic">🚗 Nema slika — dodaju se u terminu (Slikaj / Galerija)</div>';
-  return '<div class="cd-big zf-pic hk-pic" id="hkPic">'+stripHtml(p, 'cover')+'<span class="cd-cnt" id="hkCnt">1 / '+p.length+'</span></div>';
+  const p = hkPics(); if(hkPicIdx >= p.length) hkPicIdx = 0;
+  if(!p.length) return '<div class="cd-big zf-pic zf-pic-empty hk-pic hk-pic0"><span>🚗 Nema slika</span>'+HK_PICBTN+'</div>';
+  return '<div class="cd-big zf-pic hk-pic" id="hkPic">'+stripHtml(p, 'cover')+'<span class="cd-cnt" id="hkCnt">'+(hkPicIdx+1)+' / '+p.length+'</span>'+HK_PICBTN+'</div>';
+}
+/* ---------- v43 finansije: svaki red = polja Datum | Hotel | Zamena + Napomena; menja se direktno, čuva se dugmetom Sačuvaj ----------
+   📅 red = završen termin (JEDAN zapis, Zoran 17.11.): izmena menja i termin (iznos = hotel + zamena); ne briše se odavde. */
+const fmtBroj = n=> (n===null || n===undefined || n==='' || isNaN(Number(n))) ? '' : String(Math.round(Number(n))).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+function hkSumHtml(){
+  const f = (hkDraft && hkDraft.fin) || [];
+  const H = f.reduce((a,r)=>a+(normIznos(r.hotel)||0),0), Z = f.reduce((a,r)=>a+(normIznos(r.zamena)||0),0);
+  return '<div><small>Hotel</small><b>'+fmtIznos(H)+'</b></div><div><small>Zamena</small><b>'+fmtIznos(Z)+'</b></div><div class="uk"><small>Ukupno</small><b>'+fmtIznos(H+Z)+'</b></div>';
+}
+function hkFinHtml(){
+  const f = hkDraft.fin || [];
+  const F = 'autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next"';
+  const fld = (i, k, l, st, attr)=> '<div class="field" style="'+(st||'')+'" onclick="zfFocus(event,this)"><label>'+l+'</label><input id="hf_'+i+'_'+k+'" '+(attr||'type="text" '+F)+' value="'+escapeHtml(k==='hotel'||k==='zamena' ? fmtBroj(normIznos(f[i][k])) : (f[i][k]||''))+'" oninput="hkFinSet('+i+',\''+k+'\', this.value)"></div>';
+  return '<div class="hf-list" id="hfList">'+f.map((r,i)=>'<div class="hf-row'+(r.tid?' hf-t':'')+'" data-i="'+i+'">'+
+      (r.tid ? '<div class="hf-tag">📅 iz termina — izmena menja i termin</div>' : '')+
+      '<div class="zf-row">'+fld(i,'datum','Datum','flex:0 0 38%','type="date"')+fld(i,'hotel','Hotel','',''+'type="text" inputmode="numeric" '+F)+fld(i,'zamena','Zamena','','type="text" inputmode="numeric" '+F)+'</div>'+
+      '<div class="zf-row">'+fld(i,'napomena','Napomena')+'</div></div>').join('')+
+    (f.length ? '' : '<div class="hs-empty">Još nema plaćanja.</div>')+
+    '</div><button type="button" class="hf-add" onclick="hkFinAdd()">＋ Dodaj red</button>';
+}
+function hkFinSet(i, k, v){
+  if(!hkDraft || !hkDraft.fin[i]) return;
+  hkDraft.fin[i][k] = v;
+  const sm = document.getElementById('hkSum'); if(sm) sm.innerHTML = hkSumHtml();
+  hkSet('_fin', Date.now());   /* korak ↶ ↷ i Sačuvaj kao kod ostalih polja */
+}
+function hkFinAdd(){
+  if(!hkDraft) return;
+  hkDraft.fin.unshift({ tid:'', datum: todayISO(), hotel:'', zamena:'', napomena:'' });
+  hkPush(); renderHotelCard();
+  const el = document.getElementById('hf_0_hotel'); if(el){ el.scrollIntoView({ block:'center' }); el.focus(); }
+}
+function hkFinDel(i){
+  const r = hkDraft && hkDraft.fin[i]; if(!r) return;
+  if(r.tid){ showNote('Red iz termina se briše u Završenom (termin).', {warn:true}); renderHotelCard(); return; }
+  hkDraft.fin.splice(i, 1); hkPush(); renderHotelCard();
+  showNote('Red je uklonjen — ↶ vraća; konačno tek kad pritisneš Sačuvaj.');
+}
+function wireHkFin(){
+  const L = document.getElementById('hfList'); if(!L) return;
+  L.querySelectorAll('.hf-row').forEach(row=>{
+    const i = +row.dataset.i;
+    if(!row.classList.contains('hf-t')) swipeToDelete(row, null, false, false, ()=>hkFinDel(i));
+    const els = ['hotel','zamena','napomena'].map(k=>document.getElementById('hf_'+i+'_'+k));
+    els.forEach((el,j)=>{
+      if(!el) return;
+      wireBackspace(el, j>0 ? els[j-1] : null);
+      if(el._hkEnter) return; el._hkEnter = true;
+      el.addEventListener('keydown', (e)=>{ if(e.key !== 'Enter' || e.isComposing) return; e.preventDefault(); const n = els[j+1]; if(n) n.focus(); else el.blur(); });
+    });
+  });
 }
 /* pregled slika samo za gledanje (bez brisanja i profilne) */
 let roCloseFn = null, roStrip = null;
@@ -2253,8 +2329,11 @@ function saveHotelCard(keepOpen, note){
   const v = { mesto:String(d.mesto).trim(), ime:String(d.ime).trim(), telefon:String(d.telefon||'').trim(), auto:String(d.auto||'').trim(), tablica:normTab(d.tablica),
     adresa:String(d.adresa||'').trim(), cena: normIznos(d.cena)||0, dimenzija:String(d.dimenzija||'').trim(), felne:String(d.felne||'').trim(), letnje:String(d.letnje||'').trim(),
     zimske:String(d.zimske||'').trim(), od: d.od||'', kod: d.kod||'', status: d.status||'aktivan', napomena:String(d.napomena||'').trim() };
+  /* v43: stari redovi (bez termina) iz polja; redovi termina se upisuju u termine posle uspešnog čuvanja kartice */
+  v.redovi = (d.fin||[]).filter(r=>!r.tid).map(r=>({ datum: /^\d{4}-\d{2}-\d{2}$/.test(r.datum||'') ? r.datum : todayISO(), hotel: normIznos(r.hotel)||0, zamena: normIznos(r.zamena)||0, napomena: String(r.napomena||'').trim() }));
+  const pics = (d.slike||[]).slice();
   let h = hkId ? hotel.find(x=>x.id===hkId) : null; const old = h ? JSON.stringify(h) : null;
-  if(h){ if(h.status !== v.status) v.statusDatum = todayISO(); if(!h.vozilo){ const hv = hkVozilo(); if(hv) v.vozilo = hv; } Object.assign(h, v); }
+  if(h){ if(h.status !== v.status) v.statusDatum = todayISO(); if(!h.vozilo){ const hv = hkVozilo() || (pics.length ? uid('v') : ''); if(hv) v.vozilo = hv; } Object.assign(h, v); }
   else {
     const src = d._src ? getItem(d._src) : null;
     const vid = (src && src.vozilo) || d.vozilo || uid('v');
@@ -2263,13 +2342,58 @@ function saveHotelCard(keepOpen, note){
     if(formDraft && !formDraft.vozilo) formDraft.vozilo = vid;
   }
   if(!persistHotel()){ if(old){ Object.keys(h).forEach(k=>delete h[k]); Object.assign(h, JSON.parse(old)); } else hotel = hotel.filter(x=>x!==h); return; }
-  hkId = h.id; hkOrig = hkKey(Object.assign({}, h, { cena:String(h.cena||'') })); hkDraft = Object.assign({}, h, { cena:String(h.cena||''), _src:'' });
+  /* slike: pripadaju vozilu kartice (iste u terminima tog auta) */
+  const vid = h.vozilo;
+  if(vid && (picSig(pics) !== picSig(SLIKE.get(vid)) || pics.some((p,i)=> p !== (SLIKE.get(vid)||[])[i]))){ Slike.postavi(vid, pics).then(ok=>{ if(ok) opisSlikaRun(); }); }
+  /* redovi termina: JEDAN zapis — iznos termina = hotel + zamena, deo za hotel, datum, napomena */
+  const tch = [];
+  (d.fin||[]).filter(r=>r.tid).forEach(r=>{
+    const it = getItem(r.tid); if(!it) return;
+    const hi = normIznos(r.hotel)||0, z = normIznos(r.zamena)||0, dat = /^\d{4}-\d{2}-\d{2}$/.test(r.datum||'') ? r.datum : it.datum, nap = String(r.napomena||'').trim();
+    if(it.datum === dat && (it.iznos||0) === hi+z && hotelDeo(h, it) === hi && String(it.napomena||'').trim() === nap) return;
+    tch.push([it, { datum: it.datum, iznos: it.iznos, hotelIznos: it.hotelIznos, napomena: it.napomena }]);
+    it.datum = dat; it.iznos = (hi+z) || null; it.hotelIznos = hi; it.napomena = nap;
+  });
+  if(tch.length && !persistItems(true)){ tch.forEach(([it, o])=>Object.assign(it, o)); showBanner('Redovi iz termina NISU sačuvani (kartica jeste).'); }
+  hkId = h.id; hkDraft = Object.assign({}, h, { cena:String(h.cena||''), _src:'', fin: hkFinOf(h), slike: pics }); hkOrig = hkKey();
   render(); if(document.getElementById('hlBackdrop')) renderHotelList();
   if(formDraft && document.getElementById('formBackdrop')) renderItemForm();
   if(keepOpen){ renderHotelCard(); showNote(note || 'Hotel kartica je sačuvana.'); return; }
   hkNoAsk = true; closeHotelCard(); showNote('Hotel kartica je sačuvana: '+h.ime+' (br. '+h.mesto+')');
 }
 let hkDupOk = false;
+/* ---------- v43 📅 Zakaži iz hotel kartice: kartica se sačuva (ako ima izmena), pa kalendar → „U koliko sati?“ → obrazac novog
+   termina sa podacima kartice (kao „Novi termin“ iz Završenog; upis tek na Sačuvaj) ---------- */
+function hkZakazi(){
+  if(!hkDraft) return;
+  if(!hkId || hkKey() !== hkOrig){ saveHotelCard(true); if(!hkId || hkKey() !== hkOrig) return; }
+  const h = hotel.find(x=>x.id===hkId); if(!h) return;
+  if(formCloseFn){ showNote('Termin je već otvoren — zatvori ga pa zakaži iz kartice.', {warn:true}); return; }
+  const r = rimOf(h.dimenzija);
+  const src = { ime:h.ime||'', auto:h.auto||'', dimenzije: r ? 'R'+r : '', tablica:h.tablica||'', telefon:h.telefon||'', vozilo:h.vozilo||'', iznos:null, napomena:'' };
+  hkNoAsk = true; closeHotelCard();
+  hzSrc = src; openHzDate();
+}
+let hzSrc = null;
+function openHzDate(){
+  let el = document.getElementById('hzDate');
+  if(!el){
+    el = document.createElement('input'); el.type = 'date'; el.id = 'hzDate'; el.className = 'rd-date'; el.tabIndex = -1; el.setAttribute('aria-hidden','true');
+    el.addEventListener('change', ()=>{ const v = el.value; el.value = ''; if(v && hzSrc){ openTimePicker(t=>hzOnTime(v, t), '', v); tpNew = true; renderTimePicker(); } });
+    document.body.appendChild(el);
+  }
+  el.value = ''; el.min = todayISO();
+  void el.offsetWidth;
+  requestAnimationFrame(()=> requestAnimationFrame(()=>{ try{ el.showPicker(); }catch(e){ el.focus(); } }));
+}
+function hzOnTime(datum, vreme){
+  if(!hzSrc || !/^\d{4}-\d{2}-\d{2}$/.test(datum) || !/^\d{2}:\d{2}$/.test(vreme||'')) return;
+  if(isPastDT(datum, vreme)){ showBanner('Vreme '+vreme+' je prošlo — izaberi kasnije vreme.'); openTimePicker(t=>hzOnTime(datum, t), '', datum); tpNew = true; renderTimePicker(); return; }
+  const src = hzSrc; hzSrc = null;
+  const fn = ()=> openNewFromHist(src, datum, vreme);
+  if(suppressPopstateCount > 0){ afterBackQ.push(fn); setTimeout(()=>{ const i = afterBackQ.indexOf(fn); if(i!==-1){ afterBackQ.splice(i,1); fn(); } }, 400); }
+  else fn();
+}
 /* iz menija termina (dugi pritisak): 🏨 U hotel za gume / Hotel kartica */
 /* v41: iz otvorenog termina (čip „🏨 U hotel“ na slici) — kartica dobija ime, telefon, auto, registraciju i auto (slike) termina */
 function hotelFromForm(){
@@ -2427,7 +2551,7 @@ function swClose(anim){
   o.tile.classList.toggle('sw-anim', anim !== false); o.tile.style.transform = '';
   setTimeout(()=>{ if(o.del) o.del.remove(); if(o.done) o.done.remove(); o.tile.classList.remove('sw-anim'); }, anim === false ? 0 : 220);
 }
-function swipeToDelete(tile, id, allowDone, back){
+function swipeToDelete(tile, id, allowDone, back, onDel){   /* v43: onDel = sopstveno brisanje (red finansija) */
   let x0 = 0, y0 = 0, on = false, dx = 0, track = false;
   const mkDel = ()=>{
     const d = document.createElement('button');
@@ -2436,7 +2560,7 @@ function swipeToDelete(tile, id, allowDone, back){
     d.style.top = tile.offsetTop + 'px'; d.style.height = tile.offsetHeight + 'px';
     d.style.left = (tile.offsetLeft + tile.offsetWidth - 96) + 'px';
     const r = getComputedStyle(tile); d.style.borderRadius = r.borderTopRightRadius + ' ' + r.borderTopRightRadius + ' ' + r.borderBottomRightRadius + ' ' + r.borderBottomRightRadius;
-    d.onclick = (e)=>{ e.stopPropagation(); swClose(); confirmDeleteItem(id); };
+    d.onclick = (e)=>{ e.stopPropagation(); swClose(); if(onDel) onDel(); else confirmDeleteItem(id); };
     tile.parentNode.appendChild(d);
     return d;
   };
@@ -3084,7 +3208,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 42; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 43; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -4684,7 +4808,7 @@ function openHelpScreen(){
     { t:'Zauzeti sati', c:'U panelu „U koliko sati?“ sat u kome tog dana već ima zakazan termin je obojen i ima mali broj termina u uglu. Kad izabereš sat, ispod minuta piše ime klijenta koji je u to vreme, a ispod je spisak svih termina tog sata. Zauzeto može i dalje da se izabere (dva auta u isto vreme).' },
     { t:'Telefon i SMS', c:'Na kartici je broj napisan čitljivo (063 880 8260). U terminu: kad je broj upisan, 📞 zove klijenta, a 💬 otvara Poruke sa gotovim podsetnikom („Poštovani, podsećamo Vas na termin za zamenu guma sutra u 12:00. Tire Time“) — samo dodirneš Pošalji. Kad broja nema, 📞 otvara Telefon (da prepišeš broj iz poziva), a 📋 nalepi kopirani broj.' },
     { t:'Hotel za gume', c:'Kvadrat 🏨 Hotel otvara spisak klijenata čije gume čuvaš, po grupama: ⚠ Sporno (crveno, npr. nije došao na zamenu), Čekaju zamenu (narandžasto), ✓ Zamenjeno ove sezone (zeleno) i Na čekanju — bez guma kod nas (klijent ostaje u hotelu, npr. gume bačene, a na leto donosi nove). Gore piše sezona (zimska 1.10.–kraj februara, letnja 1.3.–30.9.) i koliko je zamenjeno. Pretraga po imenu, registraciji, dimenziji ili broju. Dodavanje: ＋ Novi → izaberi klijenta iz termina (ili prazna kartica); ili u otvorenom terminu dugme „🏨 U hotel“ na slici; ili dugi pritisak na termin → 🏨 U hotel za gume. Uklanjanje: u hotel kartici dole 🗑 Ukloni (pita pre brisanja) — kartica ide u korpu (Podešavanja → Korpa), odakle se vraća dugmetom Vrati, sa svim podacima i starim redovima.' },
-    { t:'Hotel kartica', c:'Mesto (broj) je broj koji pokazuje gde su gume. Tu su adresa, dimenzija, felne, cena čuvanja mesečno, brend letnjih i zimskih, od kada su u hotelu, „Kod nas su: letnje / zimske / ništa“ i Status (Aktivan, ⚠ Sporno, Na čekanju — bez guma). Gore su slike auta, iste kao u terminima; dodir otvara pregled preko celog ekrana (slike se dodaju u terminu). Polja rade kao u terminu: dodir isprazni polje, a stari tekst se vidi osenčen (kucanje ili diktat upisuje novo, drugi dodir vraća stari tekst za ispravku, Backspace u praznom polju = korak nazad u prethodno polje, strelica na tastaturi = sledeće polje). Napomena se otvara preko celog ekrana kao u terminu (↶ ↷ Sačuvaj; nazad čuva samo napomenu, ostale izmene čekaju Sačuvaj). Ispod su finansije: zbir hotel, zamena i ukupno, i svi redovi (stari iz Excela i završeni termini). Zamena sezone okreće letnje ↔ zimske.' },
+    { t:'Hotel kartica', c:'Mesto (broj) je broj koji pokazuje gde su gume. Tu su adresa, dimenzija, felne, cena čuvanja mesečno, brend letnjih i zimskih, od kada su u hotelu, „Kod nas su: letnje / zimske / ništa“ i Status (Aktivan, ⚠ Sporno, Na čekanju — bez guma). Gore su slike auta, iste kao u terminima: 📷 Slikaj i 🖼️ Galerija dodaju slike direktno u kartici, dodir na sliku otvara pregled (★ profilna, 🗑 briše); sve se čuva dugmetom Sačuvaj. Polja rade kao u terminu: dodir isprazni polje, a stari tekst se vidi osenčen (kucanje ili diktat upisuje novo, drugi dodir vraća stari tekst za ispravku, Backspace u praznom polju = korak nazad u prethodno polje, strelica na tastaturi = sledeće polje). Napomena se otvara preko celog ekrana kao u terminu (↶ ↷ Sačuvaj; nazad čuva samo napomenu, ostale izmene čekaju Sačuvaj). Ispod su finansije: zbir hotel, zamena i ukupno, i svaki red kao polja Datum, Hotel, Zamena i Napomena — dodir na polje i menjaš direktno, zbir se odmah preračuna; ＋ Dodaj red dodaje nov red na vrh; prevuci red ulevo → Izbriši (↶ vraća, konačno tek na Sačuvaj). Red sa zelenom ivicom „📅 iz termina“ je završen termin: izmena tu menja i taj termin (iznos = hotel + zamena), a briše se u Završenom. Dole: 📅 Zakaži (kartica se sačuva, pa kalendar i sat, pa nov termin sa podacima kartice — upisuje se na Sačuvaj), Zamena sezone (letnje ↔ zimske), Ukloni, Otkaži, Sačuvaj.' },
     { t:'Termin hotel klijenta', c:'Na kartici na početnom ekranu pored imena piše 🏨 i broj (⚠ ako je sporno). U terminu je traka „Hotel br. … · kod nas: …“ — dodir otvara hotel karticu. Iznos je podeljen: Zamena + Hotel = Ukupno; Hotel se sam predloži (meseci od prošle zamene × cena), a možeš ga promeniti. Kad termin prevučeš u Završeno, klijent prelazi u „zamenjeno ove sezone“, a kod nas se okrene (posle zimske zamene: letnje). Ako termin vratiš iz Završenog, vrati se i to.' },
     { t:'Nesačuvana izmena', c:'Ako u terminu nešto promeniš pa ga zatvoriš bez čuvanja (✕, Otkaži, dodir van ili korak nazad), aplikacija pita „Sačuvati izmene?“: Sačuvaj čuva, Otkaži izmene zatvara termin bez promene. Dodir van prozora ili korak nazad vraća u termin.' },
     { t:'↶ ↷ u terminu', c:'Strelice gore u terminu vraćaju i ponavljaju izmene u celom terminu (polja, napomenu i slike), korak po korak. Korak je pauza u kucanju ili diktatu, ili jedna radnja (vreme, slika). Dodir na strelicu skloni tastaturu — tako mikrofon na tastaturi ostaje ispravan.' },
