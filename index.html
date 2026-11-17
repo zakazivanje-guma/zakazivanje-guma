@@ -1044,6 +1044,13 @@ body.noting .vw-screen, body.noting .cam-screen{ top:var(--note-h); }
 
 .hk .hk-sez.l{ background:var(--sez-l); } .hk .hk-sez.z{ background:var(--sez-z); }
 .hl .hs-season, .hl .hl-q, .hl .hl-new{ background:var(--pearl); }
+
+/* v45 (Zoran 18.11.): kvadrat sa brojem i bočna traka kao polje vremena na terminu (sporno ostaje crveno, na čekanju bledo) */
+.hl .hl-row, .hl .hl-row.ok{ border-left-color:var(--green-pale); }
+.hl .hl-n, .hl .hl-row.ok .hl-n{ background:var(--green-pale); color:var(--text); font-family:var(--font-title); font-weight:700; font-size:24px; font-variant-numeric:lining-nums; }
+[data-theme="crna"] .hl .hl-n, [data-theme="crna"] .hl .hl-row:not(.sp):not(.out){ --green-pale:#303035; }
+[data-theme="ponoc"] .hl .hl-n, [data-theme="ponoc"] .hl .hl-row:not(.sp):not(.out){ --green-pale:rgba(255,255,255,.05); }
+.hl .hl-row.sp .hl-n, .hl .hl-row.out .hl-n{ font-family:var(--font-title); font-variant-numeric:lining-nums; }
 </style>
 </head>
 <body>
@@ -3285,7 +3292,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 44; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 45; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
