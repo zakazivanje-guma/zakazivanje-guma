@@ -1053,6 +1053,13 @@ body.noting .vw-screen, body.noting .cam-screen{ top:var(--note-h); }
 /* zamenjeni ove sezone: zeleno kao Završeno na početnom (Zoran 18.11.) */
 .hl .hl-row.ok{ border-left-color:#2E7D32; } .hl .hl-row.ok .hl-n{ background:#2E7D32; color:#fff; }
 .hl .hl-row.sp .hl-n, .hl .hl-row.out .hl-n{ font-family:var(--font-title); font-variant-numeric:lining-nums; }
+
+/* v46: evropski datum preko polja za datum */
+.eu-wrap{ position:relative; display:block; }
+input.eu-date{ color:transparent !important; -webkit-text-fill-color:transparent; }
+input.eu-date::-webkit-datetime-edit{ opacity:0; }
+.eu-txt{ position:absolute; left:0; top:50%; transform:translateY(-50%); pointer-events:none; color:var(--text); white-space:nowrap; font:inherit; }
+.eu-txt.ph{ color:var(--text-dim); }
 </style>
 </head>
 <body>
@@ -1074,6 +1081,28 @@ let pastPeriod = '';      /* v23: Završeno — '' = sve, 'GGGG' = godina, 'GGGG
 let searchQuery = '';
 let isProcessing = false; /* AI obrađuje unos iz donje trake */
 
+/* v46 (Zoran 18.11.): datum svuda dan.mesec.godina. — polje za datum (type=date) telefon prikazuje po jeziku Chrome-a
+   (npr. 11/18/2026). Zato se ispis polja sakrije, a preko njega piše evropski datum; dodir i dalje otvara kalendar.
+   Važi za svako vidljivo polje datuma (termin, hotel kartica, finansije), i kad se vrednost menja iz koda (setter). */
+function euDateTxt(v){ const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v||''); return m ? (+m[3])+'.'+(+m[2])+'.'+m[1]+'.' : ''; }
+function euSync(el){ const sp = el && el._euSpan; if(!sp) return; const t = euDateTxt(el.value); sp.textContent = t || 'dan.mesec.godina.'; sp.classList.toggle('ph', !t); }
+function euEnhance(root){
+  (root || document).querySelectorAll('input[type="date"]:not(.rd-date):not(.eu-date)').forEach(el=>{
+    const w = document.createElement('span'); w.className = 'eu-wrap';
+    el.parentNode.insertBefore(w, el); w.appendChild(el);
+    const sp = document.createElement('span'); sp.className = 'eu-txt'; sp.setAttribute('aria-hidden','true'); w.appendChild(sp);
+    el.classList.add('eu-date'); el._euSpan = sp;
+    const cs = getComputedStyle(el); sp.style.font = cs.font; sp.style.left = cs.paddingLeft; euSync(el);
+  });
+}
+(function(){
+  const d = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  Object.defineProperty(HTMLInputElement.prototype, 'value', { configurable:true, enumerable:d.enumerable,
+    get(){ return d.get.call(this); }, set(v){ d.set.call(this, v); if(this._euSpan) euSync(this); } });
+  ['input','change'].forEach(ev=> document.addEventListener(ev, e=>{ if(e.target && e.target._euSpan) euSync(e.target); }, true));
+  const go = ()=> new MutationObserver(ms=>{ for(const m of ms) if(m.addedNodes.length){ euEnhance(); break; } }).observe(document.body, { childList:true, subtree:true });
+  if(document.body) go(); else document.addEventListener('DOMContentLoaded', go);
+})();
 function todayISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function daysUntil(iso){
   if(!iso) return null;
@@ -1508,7 +1537,7 @@ function handleImportFile(fileInput){
     if(backup.app && backup.app!=='zakazivanje-guma'){ showBanner('Ovo je kopija druge aplikacije ('+backup.app+'), ne Zakazivanja guma.'); return; }
     if(!backup.app && backup.items.length && !backup.items.every(x=>x && x.datum)){ showBanner('Ovo nije kopija Zakazivanja guma (stavke nemaju datum termina).'); return; }
     const count = backup.items.length;
-    const when = backup.exportedAt ? backup.exportedAt.slice(0,10) : 'nepoznatog datuma';
+    const when = backup.exportedAt ? dmyShort(backup.exportedAt.slice(0,10)) : 'nepoznatog datuma';   /* v46: evropski datum */
     showConfirm('Ovo će zameniti trenutne termine sa '+count+' '+terminRec(count)+' iz bekapa od '+when+'. Trenutni podaci će biti izgubljeni. Nastaviti?', ()=>{
       applyBackup(backup);
     }, 'Da, uvezi');
@@ -3297,7 +3326,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 45; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 46; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -4912,6 +4941,7 @@ function openHelpScreen(){
     { t:'Istorija klijenta', c:'Svaki završen termin je zapis u istoriji klijenta, kao servisna knjižica. Kad klijent ima bar jednu završenu zamenu, na vrhu svakog njegovog termina piše "Ranije: …" (na samom završenom terminu "Istorija: …") sa poslednjom zamenom; dodir otvara sve njegove zamene (datum, auto, prečnik, napomena, iznos, ukupno). Dodir na zamenu otvara je za izmenu ili dopisivanje; korak nazad vraća u termin. Isti klijent se prepoznaje po telefonu, a bez telefona po imenu i prezimenu. Brisanje zapisa iz istorije traži potvrdu; obrisano je u korpi koliko dana je podešeno.' },
     { t:'Pretraga i prikaz', c:'"Pretraži" traži po imenu, autu, prečniku, napomeni, telefonu i iznosu, uvek i u zakazanim i u završenim (prvo zakazani), bez obzira na kvačice i druge oznake nad slovima (č, ë, é...), velika slova, ćirilicu ili latinicu i znakove između (crtica, tačka, razmak: „c4“ nalazi i „C-4“). Ikonica ▦/☰ menja prikaz između liste i mreže. Kartice su iste visine (4 na ekranu): gore ime i iznos, ispod vreme, pa u nizu auto · prečnik · telefon (dodir na broj zove), a napomena uvek u novom redu i dobija ostatak mesta. Crven kvadrat vremena = još neko ima isto vreme.' },
     { t:'Sortiranje', c:'Dugme ⇅ gore (pored prikaza i podešavanja) otvara „Sortiraj“: "Datum i vreme" ređa termine po danu, pa po vremenu. "Ručno (ručke)" prikaže ručku (⠿) desno na svakoj kartici: drži je i prevuci karticu na novo mesto, u okviru istog dana. Ručni redosled se pamti.' },
+    { t:'Datumi', c:'Svako polje za datum (termin, hotel kartica, finansije) piše dan.mesec.godina. (npr. 18.11.2026.). Dodir na polje otvara kalendar telefona — on sam izgleda po jeziku telefona/Chrome-a.' },
     { t:'Izmena podataka', c:'Dodir na polje ga osenči: Backspace te vrati na prethodno polje bez brisanja, a prvo slovo ili mikrofon zameni stari tekst novim. Drugi dodir vraća tekst u polje za uređivanje dela teksta. Ako izađeš bez unosa, stari tekst ostaje. Taster za brisanje na označenom ili praznom polju ne briše, nego te vrati na prethodno polje.' },
     { t:'Obaveštenja', c:'Sve poruke aplikacije pojavljuju se gore, u okviru sa velikim slovima: zeleno kad je nešto urađeno, crveno kad nešto nije uspelo. Okvir nestane sam (posle 4 sekunde, greška posle 6).' },
     { t:'Brisanje prevlačenjem', c:'U prikazu spiska povuci karticu prstom ulevo: ispod nje se pojavi crveno dugme "Izbriši". Dodir na njega traži potvrdu, pa termin ide u korpu. Dodir bilo gde drugde vraća karticu na mesto.' },
