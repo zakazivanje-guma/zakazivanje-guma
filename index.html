@@ -986,9 +986,10 @@ body.noting .vw-screen, body.noting .cam-screen{ top:var(--note-h); }
 .hs-season{ font-size:14.5px; margin:0 2px 10px; }
 .pic-cap{ position:absolute; left:60px; top:12px; max-width:calc(100% - 140px); z-index:3; background:rgba(0,0,0,.6); color:#fff; font-size:15px; font-weight:600; padding:6px 11px; border-radius:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none; }
 .pic-cap.p0{ left:12px; }
-.vw-name{ flex:none; display:flex; align-items:center; gap:10px; margin:0 16px 10px; padding:9px 14px; border-radius:12px; background:#1c1c1c; border:1px solid #444; color:#fff; touch-action:auto; }
+.vw-top{ gap:12px; } .vw-top b{ flex:none; }
+.vw-name{ flex:1; min-width:0; display:flex; align-items:center; gap:8px; padding:9px 12px; border-radius:12px; background:#1c1c1c; border:1px solid #444; color:#fff; touch-action:auto; }
 .vw-name .t{ flex:1; min-width:0; } .vw-name small{ display:block; color:#aaa; font-size:12px; }
-.vw-name input{ width:100%; background:transparent; border:none; outline:none; color:#fff; font-size:17px; font-family:inherit; padding:2px 0 0; }
+.vw-name input{ width:100%; background:transparent; border:none; outline:none; color:#fff; font-size:17px; font-family:inherit; padding:0; }
 .vw-name input::placeholder{ color:#777; } .vw-name .ed{ color:#ccc; font-size:18px; }
 .hf-nap{ cursor:text; } .hf-nap-t{ font-size:16px; line-height:1.4; white-space:pre-wrap; word-break:break-word; color:var(--text); min-height:22px; padding-top:2px; } .hf-nap-t .ph{ color:var(--text-dim); }
 .hl .hl-sq{ justify-content:flex-start; gap:8px; margin:0 0 12px; } .hl .hl-q[hidden]{ display:none; } .hl .hl-q{ margin:0 0 10px; }
@@ -1811,8 +1812,9 @@ function openViewer(i){
 function renderViewer(){
   const el = document.getElementById('vwScreen'); if(!el || !picArr().length) return;
   const n = picArr().length;
-  el.innerHTML = '<div class="vw-top"><span style="width:42px"></span><b id="vwCnt"></b><button class="cam-btn vw-del" onclick="viewerDelete()" aria-label="Obriši sliku">🗑</button></div>'+
-    '<label class="vw-name" onclick="event.stopPropagation()"><span class="t"><small>Naziv slike</small><input id="vwName" type="text" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" enterkeyhint="done" placeholder="dodirni i upiši naziv" onchange="viewerNaziv(this.value, +this.dataset.i)" onkeydown="if(event.key===\'Enter\'){ event.preventDefault(); this.blur(); }"></span><span class="ed">✎</span></label>'+
+  /* v50 (Zoran 19.11.): naziv u gornjem redu sa brojem slika i korpom, bez naslova */
+  el.innerHTML = '<div class="vw-top"><label class="vw-name" onclick="event.stopPropagation()"><span class="t"><input id="vwName" type="text" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" enterkeyhint="done" placeholder="naziv slike" onchange="viewerNaziv(this.value, +this.dataset.i)" onkeydown="if(event.key===\'Enter\'){ event.preventDefault(); this.blur(); }"></span><span class="ed">✎</span></label>'+
+    '<b id="vwCnt"></b><button class="cam-btn vw-del" onclick="viewerDelete()" aria-label="Obriši sliku">🗑</button></div>'+
     '<div class="vw-img">'+stripHtml(picArr(), 'contain')+'</div>'+
     '<div class="vw-bot"><button class="vw-prof" id="vwProf" onclick="viewerSetProfile()"></button>'+
     '<div class="vw-hint">'+(n>1 ? '‹ prevuci › · ' : '')+'dva prsta: uvećaj i okreni · dodir na sliku = nazad</div></div>';
@@ -3516,7 +3518,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 49; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 50; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -5110,7 +5112,7 @@ function openHelpScreen(){
     { t:'Izmena glasom', c:'Isto polje menja postojeći termin kad kažeš šta se menja: \"Petra Petrovića pomeri na 12\", \"Golf 7 prebaci sa sutra na četvrtak u 9\", \"Marko dolazi u 11 umesto u 10\", \"Petru promeni cenu na 5000\". Menja se samo rečeno, termin se odmah čuva (i u Google kalendaru), a gore piše šta je bilo i šta je sada. Ako odgovara više termina, izabereš koji; ako nijedan, tekst ostaje u polju.' },
     { t:'Otkazano', c:'Termin se otkazuje glasom (\"otkaži Petra\", \"Petar je otkazao\") ili dugim pritiskom na karticu → Otkaži termin. Otkazan termin ide u Otkazano sa svim podacima i briše se iz Google kalendara. U Završenom traka gore pokazuje zbir upisanih cena (termini bez cene se samo prebroje); dodir na nju bira Sve, godinu ili mesec, a spisak pokazuje samo taj period. U Otkazanom: prevuci udesno → Vrati (termin kome je prošlo vreme otvara kalendar za nov dan i vreme), ili drži prst za označavanje (Vrati u zakazane / Obriši). Kad klijent ponovo pozove, izdiktiraj nov termin: aplikacija ponudi da vrati njega sa svim podacima.' },
     { t:'Ispravka', c:'Dodir na karticu otvara termin preko celog ekrana. Natpis je u samom polju; polja koja nisu uneta imaju crven okvir. Dole su Slikaj · Galerija · Obriši (termin ide u korpu) · Otkaži · Sačuvaj; Sačuvaj je bled dok ništa nije promenjeno. Dug pritisak (drži prst) na kartici otvara brzi meni: Izmeni ili Obriši.' },
-    { t:'Slike vozila', c:'U terminu gore je slika auta. Slikaj otvara kameru (više slika zaredom, pa Gotovo), Galerija bira više slika odjednom. Prevuci prstom za sledeću sliku; dodir na sliku otvara pregled preko celog ekrana (dva prsta uvećavaju, 🗑 briše, „★ Postavi kao profilnu“ bira sliku koja je prva). U pregledu gore je polje Naziv slike: dodirni i upiši (npr. „Oštećenje — zadnji branik“), Enter ili listanje čuva odmah; naziv se vidi na slici u terminu i u hotel kartici. Slike pripadaju autu, ne terminu: novi termin istog auta (iz Završenog ili „Vrati njega“) ima iste slike, pa oštećenja dodaješ ili brišeš kad se stanje promeni. Na početnom ekranu slika se ne vidi. Slike idu i u rezervnu kopiju.' },
+    { t:'Slike vozila', c:'U terminu gore je slika auta. Slikaj otvara kameru (više slika zaredom, pa Gotovo), Galerija bira više slika odjednom. Prevuci prstom za sledeću sliku; dodir na sliku otvara pregled preko celog ekrana (dva prsta uvećavaju, 🗑 briše, „★ Postavi kao profilnu“ bira sliku koja je prva). U pregledu gore, pored broja slika, je polje za naziv slike: dodirni i upiši (npr. „Oštećenje — zadnji branik“), Enter ili listanje čuva odmah; naziv se vidi na slici u terminu i u hotel kartici. Slike pripadaju autu, ne terminu: novi termin istog auta (iz Završenog ili „Vrati njega“) ima iste slike, pa oštećenja dodaješ ili brišeš kad se stanje promeni. Na početnom ekranu slika se ne vidi. Slike idu i u rezervnu kopiju.' },
     { t:'Registracija', c:'Polje Registracija je u redu sa prečnikom; tastatura se otvara sa velikim slovima. Može i glasom („…Golf 7, NS 123 AB“), a po izgovorenoj registraciji aplikacija prepoznaje i stari auto iz Završenog. Kad dodaš slike, a polje je prazno, AI pročita tablicu sa slike i upiše je — proveri je, može da se ispravi. Pretraga nalazi auto po registraciji bez obzira na razmake i crtice („ns123ab“ = „NS 123-AB“) i po onome što je AI video na slikama (boja, felne, oštećenja).' },
     { t:'Napomena', c:'Napomena je poslednje polje i zauzima ostatak ekrana. Dodir na nju otvara je preko celog ekrana, kao beležnicu: gore ‹ ↶ ↷ Sačuvaj. Sačuvaj ili korak nazad čuvaju SAMO napomenu i vraćaju termin; ako si promenio i nešto drugo, dole Sačuvaj ostaje upaljeno dok i to ne sačuvaš (nov termin čuva napomenu kad ga sačuvaš).' },
     { t:'Zauzeti sati', c:'U panelu „U koliko sati?“ sat u kome tog dana već ima zakazan termin je obojen i ima mali broj termina u uglu. Kad izabereš sat, ispod minuta piše ime klijenta koji je u to vreme, a ispod je spisak svih termina tog sata. Zauzeto može i dalje da se izabere (dva auta u isto vreme).' },
