@@ -984,6 +984,7 @@ body.noting .vw-screen, body.noting .cam-screen{ top:var(--note-h); }
 .hl .hl-new{ flex:none; border:1px solid var(--line); background:var(--bg-elevated); color:var(--text); border-radius:12px; padding:8px 12px; font-weight:700; font-size:14px; font-family:inherit; cursor:pointer; }
 .hl .hl-q{ width:100%; box-sizing:border-box; border:1px solid var(--line); border-radius:12px; padding:10px 12px; font-size:16px; background:var(--bg-card); color:var(--text); font-family:inherit; margin:0 0 4px; }
 .hs-season{ font-size:14.5px; margin:0 2px 10px; }
+.hf-nap{ cursor:text; } .hf-nap-t{ font-size:16px; line-height:1.4; white-space:pre-wrap; word-break:break-word; color:var(--text); min-height:22px; padding-top:2px; } .hf-nap-t .ph{ color:var(--text-dim); }
 .hl .hl-sq{ justify-content:flex-start; gap:8px; margin:0 0 12px; } .hl .hl-q[hidden]{ display:none; } .hl .hl-q{ margin:0 0 10px; }
 .hs-sec{ font-size:12px; font-weight:800; letter-spacing:.05em; margin:12px 2px 6px; }
 .hs-sec.wait{ color:#B4561E; } .hs-sec.ok{ color:var(--green-deep); } .hs-sec.sp{ color:#C62828; } .hs-sec.out{ color:var(--text-dim); }
@@ -2110,14 +2111,14 @@ function hotelUvoz(){
 /* ---------- spisak (kvadrat Hotel) ---------- */
 let hlCloseFn = null, hlQuery = '', hlDone = false, hlSearch = false;
 function openHotelList(){
-  hlQuery = ''; hlDone = false; hlSearch = false;
+  hlQuery = ''; hlDone = false; hlDoneFn = null; hlSearch = false;
   const b = document.createElement('div'); b.className='modal-backdrop'; b.id='hlBackdrop';
   document.body.appendChild(b);
   renderHotelList();
   hlCloseFn = ()=>{ const x = document.getElementById('hlBackdrop'); if(x) x.remove(); hlCloseFn = null; };
   pushOverlay(hlCloseFn);
 }
-function closeHotelList(){ if(hlCloseFn) closeOverlay(hlCloseFn); }
+function closeHotelList(){ if(hlDoneFn) closeOverlay(hlDoneFn); if(hlCloseFn) closeOverlay(hlCloseFn); }
 function hlRowHtml(h, cls, sub){
   const kod = h.kod || 'ništa', kc = h.kod==='zimske' ? 'z' : h.kod==='letnje' ? 'l' : 'x';
   return '<button type="button" class="hl-row '+cls+'" data-id="'+h.id+'" onclick="openHotelCard(\''+h.id+'\')"><span class="hl-n">'+escapeHtml(h.mesto||'?')+'</span><span class="t"><b>'+escapeHtml(h.ime||'Bez imena')+
@@ -2174,7 +2175,13 @@ function hlToggleSearch(){
   renderHotelList();
   if(hlSearch && qi) qi.focus();
 }
-function hlToggleDone(){ hlDone = !hlDone; renderHotelList(); const x = document.querySelector('#hlBackdrop .ff-body'); if(x) x.scrollTop = 0; }
+/* v49 (Zoran 19.11.): korak nazad iz Završenog vraća na spisak hotela, ne na Zakazivanje */
+let hlDoneFn = null;
+function hlToggleDone(){
+  if(hlDone){ if(hlDoneFn) closeOverlay(hlDoneFn); return; }
+  hlDone = true; hlDoneFn = ()=>{ hlDone = false; hlDoneFn = null; renderHotelList(); const x = document.querySelector('#hlBackdrop .ff-body'); if(x) x.scrollTop = 0; };
+  pushOverlay(hlDoneFn); renderHotelList(); const x = document.querySelector('#hlBackdrop .ff-body'); if(x) x.scrollTop = 0;
+}
 /* v44: ulevo → Izbriši → korpa; v48: udesno → Završeno (u spisku) / Vrati u hotel (u Završenom) */
 function wireHotelList(){
   const done = hlDone ? { ic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 010 10h-3"/></svg>', t:'Vrati u hotel', fn: hotelVrati }
@@ -2246,7 +2253,7 @@ function removeHotelCard(id){
   }, 'Ukloni');
 }
 /* ---------- hotel kartica (izmena) — isti način kao termin: natpis u polju, napomena-beležnica, ↶ ↷, „Sačuvati izmene?“ ---------- */
-let hkDraft = null, hkId = null, hkOrig = '', hkCloseFn = null, hkNoAsk = false, hkHist = null, hkTimer = null, hkNapFull = false, hkNapCloseFn = null;
+let hkDraft = null, hkId = null, hkOrig = '', hkCloseFn = null, hkNoAsk = false, hkHist = null, hkTimer = null, hkNapFull = false, hkNapCloseFn = null, hkNapIdx = -1;
 const HK_FIELDS = ['mesto','ime','telefon','auto','tablica','adresa','cena','dimL','letnje','felnaL','dimZ','zimske','felnaZ','od','kod','status','napomena'];
 /* v43: ključ i koraci obuhvataju i slike (potpis) i redove finansija */
 function hkFinKey(f){ return (f||[]).map(r=>[r.tid||'', r.datum||'', normIznos(r.hotel)||0, normIznos(r.zamena)||0, String(r.napomena||'').trim()].join('|')).join('¦'); }
@@ -2266,14 +2273,14 @@ function openHotelCard(id, fromTermin){
   hkDraft.fin = hkFinOf(h);
   hkDraft.slike = vozSlike(hkVozilo()).slice();
   hkOrig = h ? hkKey() : '';
-  hkHist = { s:[hkSnap()], i:0 }; hkNoAsk = false; hkNapFull = false;
+  hkHist = { s:[hkSnap()], i:0 }; hkNoAsk = false; hkNapFull = false; hkNapIdx = -1;
   const b = document.createElement('div'); b.className='modal-backdrop'; b.id='hkBackdrop';
   document.body.appendChild(b);
   renderHotelCard();
   const fn = hkCloseFn = ()=>{
     if(hkDirty()){ const ask = ()=>{ if(hkCloseFn !== fn) return; pushOverlay(fn); askSaveHotel(); }; if(suppressPopstateCount > 0) afterBackQ.push(ask); else ask(); return; }
     const x = document.getElementById('hkBackdrop'); if(x) x.remove();
-    hkDraft = null; hkId = null; hkCloseFn = null; hkNapFull = false; hkNapCloseFn = null;
+    hkDraft = null; hkId = null; hkCloseFn = null; hkNapFull = false; hkNapCloseFn = null; hkNapIdx = -1;
   };
   pushOverlay(fn);
 }
@@ -2338,21 +2345,27 @@ function hkSwapSeason(){
   hkDraft.kod = hkDraft.kod==='letnje' ? 'zimske' : hkDraft.kod==='zimske' ? 'letnje' : (sezona().tip==='zimska' ? 'letnje' : 'zimske');
   hkPush(); renderHotelCard(); showNote('Kod nas su sada: '+hkDraft.kod+' — sačuvaj karticu.');
 }
-function expandHkNap(){
+function expandHkNap(i){
   if(hkNapFull || !hkDraft) return;
+  hkNapIdx = (typeof i === 'number' && hkDraft.fin && hkDraft.fin[i]) ? i : -1;   /* v49: i napomena reda finansija */
+  if(hkNapIdx >= 0){ hkPush(); renderHotelCard(); }
   const m = document.querySelector('#hkBackdrop .form-full'); if(!m) return;
   hkNapFull = true; m.classList.add('nap-full'); hkBar();
   hkNapCloseFn = ()=>{
     hkPush(); hkNapFull = false; hkNapCloseFn = null;
+    const red = hkNapIdx; hkNapIdx = -1;
     const mm = document.querySelector('#hkBackdrop .form-full'); if(mm) mm.classList.remove('nap-full');
+    if(red >= 0){ if(hkDraft){ renderHotelCard(); const r = document.querySelector('#hfList .hf-row[data-i="'+red+'"]'); if(r) r.scrollIntoView({ block:'center' });
+      if(hkKey() !== hkOrig) showNote('Napomena reda je upisana — sačuvaj karticu (✓ Sačuvaj).'); } return; }
     const ta = document.getElementById('hkNap'); if(ta && document.activeElement === ta) ta.blur();
     if(!hkDraft) return;
     if(hkId) saveHkNapOnly();
     else if(String(hkDraft.napomena||'').trim()) showNote('Napomena je u kartici — sačuvaće se sa karticom.');
   };
   pushOverlay(hkNapCloseFn);
+  if(hkNapIdx >= 0){ const ta = document.getElementById('hkNap'); if(ta){ ta.focus(); const n = ta.value.length; try{ ta.setSelectionRange(n, n); }catch(e){} } }
 }
-function hkNapDirty(){ const h = hkId && hotel.find(x=>x.id===hkId); return !h || String(hkDraft && hkDraft.napomena||'').trim() !== String(h.napomena||'').trim(); }
+function hkNapDirty(){ if(hkNapIdx >= 0) return true; const h = hkId && hotel.find(x=>x.id===hkId); return !h || String(hkDraft && hkDraft.napomena||'').trim() !== String(h.napomena||'').trim(); }
 function saveHkNapOnly(){
   const h = hotel.find(x=>x.id===hkId); if(!h || !hkDraft) return;
   const nn = String(hkDraft.napomena||'').trim(), old = h.napomena;
@@ -2388,9 +2401,10 @@ function renderHotelCard(){
     '<div class="field"><label>Status</label>'+seg('status',[['aktivan','Aktivan'],['sporno','⚠ Sporno'],['zavrseno','✓ Završeno']])+'</div>'+
     '<div class="field"><label>Kod nas su</label>'+seg('kod',[['letnje','☀️ Letnje'],['zimske','❄️ Zimske'],['','Ništa']])+'</div>'+
     '<div class="zf-row">'+FB('od','U hotelu od','','date')+FB('cena','Cena mesečno','','text',' inputmode="numeric"')+'</div>'+
-    '<div class="field zf-nap hk-nap" data-k="napomena"><div class="cd-lbl"><button type="button" class="nap-back" onclick="collapseHkNap()" aria-label="Nazad">'+HOME_IC.back+'</button><label>Napomena hotela</label>'+
-      '<span class="cd-fullbar">'+UR+'<button type="button" class="cd-done" id="hkNapSave" onclick="collapseHkNap()">Sačuvaj</button></span></div>'+
-      '<textarea id="hkNap" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" onfocus="expandHkNap()" onclick="expandHkNap()" oninput="hkSet(\'napomena\', this.value)">'+escapeHtml(d.napomena||'')+'</textarea></div>'+
+    '<div class="field zf-nap hk-nap" data-k="napomena"><div class="cd-lbl"><button type="button" class="nap-back" onclick="collapseHkNap()" aria-label="Nazad">'+HOME_IC.back+'</button><label>'+(hkNapIdx>=0 ? 'Napomena · '+escapeHtml(dmyShort(d.fin[hkNapIdx].datum)||'') : 'Napomena hotela')+'</label>'+
+      '<span class="cd-fullbar">'+UR+'<button type="button" class="cd-done" id="hkNapSave" onclick="collapseHkNap()">'+(hkNapIdx>=0?'Gotovo':'Sačuvaj')+'</button></span></div>'+
+      (hkNapIdx >= 0 ? '<textarea id="hkNap" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" oninput="hkFinSet('+hkNapIdx+',\'napomena\', this.value)">'+escapeHtml(d.fin[hkNapIdx].napomena||'')+'</textarea></div>'
+      : '<textarea id="hkNap" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" onfocus="expandHkNap()" onclick="expandHkNap()" oninput="hkSet(\'napomena\', this.value)">'+escapeHtml(d.napomena||'')+'</textarea></div>')+
     fin+'</div>'+
     '<div class="modal-actions ff-foot cd-foot">'+
     '<button class="home-sq" onclick="hkZakazi()"><span class="sq-box">📅</span>Zakaži</button>'+
@@ -2442,7 +2456,7 @@ function hkFinHtml(){
   return '<div class="hf-list" id="hfList">'+f.map((r,i)=>head(r)+'<div class="hf-row '+(sz(r).tip==='zimska'?'z':'l')+(r.tid?' hf-t':'')+'" data-i="'+i+'">'+
       (r.tid ? '<div class="hf-tag">📅 iz termina — izmena menja i termin</div>' : '')+
       '<div class="zf-row">'+fld(i,'datum','Datum','flex:0 0 38%','type="date"')+fld(i,'hotel','Hotel','',''+'type="text" inputmode="numeric" '+F)+fld(i,'zamena','Zamena','','type="text" inputmode="numeric" '+F)+'</div>'+
-      '<div class="zf-row">'+fld(i,'napomena','Napomena')+'</div></div>').join('')+
+      '<div class="zf-row"><div class="field hf-nap" onclick="expandHkNap('+i+')"><label>Napomena</label><div class="hf-nap-t">'+(r.napomena ? escapeHtml(r.napomena) : '<span class="ph">dodirni za upis</span>')+'</div></div></div></div>').join('')+
     (f.length ? '' : '<div class="hs-empty">Još nema plaćanja.</div>')+
     '</div><button type="button" class="hf-add" onclick="hkFinAdd()">＋ Dodaj red</button>';
 }
@@ -2469,7 +2483,7 @@ function wireHkFin(){
   L.querySelectorAll('.hf-row').forEach(row=>{
     const i = +row.dataset.i;
     if(!row.classList.contains('hf-t')) swipeToDelete(row, null, false, false, ()=>hkFinDel(i));
-    const els = ['hotel','zamena','napomena'].map(k=>document.getElementById('hf_'+i+'_'+k));
+    const els = ['hotel','zamena'].map(k=>document.getElementById('hf_'+i+'_'+k));
     els.forEach((el,j)=>{
       if(!el) return;
       wireBackspace(el, j>0 ? els[j-1] : null);
