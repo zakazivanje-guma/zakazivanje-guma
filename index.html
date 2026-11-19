@@ -1090,6 +1090,12 @@ body.noting .vw-screen, body.noting .cam-screen{ top:var(--note-h); }
 .zf.hk.nap-full .zf-body > .hk-data{ display:flex !important; flex-direction:column; flex:1 1 auto; background:transparent; padding:0; margin:0; }
 .zf.hk.nap-full .hk-data > :not(.zf-nap){ display:none !important; }
 .zf.hk.nap-full .hk-data .hk-nap{ border:none; box-shadow:none; margin-bottom:0; }
+/* v54 (Zoran 19.11.): početni ekran hotela naglašen kao kartica — grupe na tamnijoj traci, naslov grupe traka sa okvirom, redovi odvojeni */
+.hl{ --fin-band:color-mix(in srgb, var(--text) 13%, var(--bg)); }
+.hl .hs-season{ border-width:1.5px; border-color:color-mix(in srgb, var(--green-deep) 30%, var(--line)); box-shadow:0 1px 3px rgba(43,43,36,.08); font-weight:600; }
+.hl .hs-sec{ margin:18px 0 0; padding:10px 14px; border:1.5px solid color-mix(in srgb, var(--text) 18%, var(--line)); border-bottom:none; border-radius:16px 16px 0 0; background:var(--pearl); }
+.hl .hl-grp{ background:var(--fin-band); border-radius:0 0 18px 18px; padding:12px 6px 2px; margin-bottom:6px; }
+.hl .hl-row{ border-style:solid; border-width:1.5px 1.5px 1.5px 7px; border-top-color:color-mix(in srgb, var(--text) 14%, var(--line)); border-right-color:color-mix(in srgb, var(--text) 14%, var(--line)); border-bottom-color:color-mix(in srgb, var(--text) 14%, var(--line)); margin:0 0 12px; box-shadow:0 2px 7px rgba(43,43,36,.12); }
 
 /* v45 (Zoran 18.11.): kvadrat sa brojem i bočna traka kao polje vremena na terminu (sporno ostaje crveno, na čekanju bledo) */
 .hl .hl-row, .hl .hl-row.ok{ border-left-color:var(--green-pale); }
