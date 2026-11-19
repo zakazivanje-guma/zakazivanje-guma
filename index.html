@@ -1080,6 +1080,16 @@ body.noting .vw-screen, body.noting .cam-screen{ top:var(--note-h); }
 .hk .hf-list .hf-sez{ margin:0 0 12px; } .hk .hf-list .hf-row{ margin:0 0 12px; }
 .hk .hf-list .hf-row + .hf-sez{ margin-top:0; }
 .hk .hf-add{ margin-top:14px; }
+/* v53 (Zoran 19.11.): gornji deo kartice (podaci) na isti način kao finansije — tamnija traka, polja i okviri jasno odvojeni */
+.hk .sec-pod{ margin-top:14px; }
+.hk .hk-data{ background:var(--fin-band); border-radius:18px; padding:12px 7px 2px; margin-bottom:6px; }
+.hk .hk-data > .zf-row, .hk .hk-data > .field, .hk .hk-data > .hk-sez{ margin-bottom:12px; }
+.hk .hk-data .field{ border:1.5px solid color-mix(in srgb, var(--text) 18%, var(--line)); box-shadow:0 1px 3px rgba(43,43,36,.08); }
+.hk .hk-data .hk-sez{ border-width:1.5px; box-shadow:0 2px 7px rgba(43,43,36,.12); padding:7px 5px 1px; }
+.hk .hk-data .hk-sez .field{ box-shadow:none; }
+.zf.hk.nap-full .zf-body > .hk-data{ display:flex !important; flex-direction:column; flex:1 1 auto; background:transparent; padding:0; margin:0; }
+.zf.hk.nap-full .hk-data > :not(.zf-nap){ display:none !important; }
+.zf.hk.nap-full .hk-data .hk-nap{ border:none; box-shadow:none; margin-bottom:0; }
 
 /* v45 (Zoran 18.11.): kvadrat sa brojem i bočna traka kao polje vremena na terminu (sporno ostaje crveno, na čekanju bledo) */
 .hl .hl-row, .hl .hl-row.ok{ border-left-color:var(--green-pale); }
@@ -2587,6 +2597,7 @@ function renderHotelCard(){
   b.innerHTML = '<div class="modal form-full zf hk'+(hkNapFull?' nap-full':'')+'">'+
     '<div class="ff-head"><h2 class="serif">🏨 '+(h ? 'Hotel br. '+escapeHtml(h.mesto||'?') : 'Nov hotel klijent')+'</h2>'+UR+'<button class="modal-close-x" onclick="closeHotelCard()" aria-label="Zatvori">✕</button></div>'+
     '<div class="ff-body zf-body">'+hkPicsHtml()+
+    '<div class="sec sec-pod">PODACI</div><div class="hk-data">'+   /* v53: podaci na tamnijoj traci kao finansije */
     '<div class="zf-row">'+FB('ime','Ime i prezime')+FB('adresa','Adresa')+'</div>'+
     '<div class="zf-row">'+FB('telefon','Telefon','','tel',' inputmode="tel"')+FB('mesto','Mesto (broj)','','text',' inputmode="numeric"')+'</div>'+
     '<div class="zf-row">'+FB('auto','Auto')+FB('tablica','Registracija')+'</div>'+
@@ -2599,7 +2610,7 @@ function renderHotelCard(){
       '<span class="cd-fullbar">'+UR+'<button type="button" class="cd-done" id="hkNapSave" onclick="collapseHkNap()">'+(hkNapIdx>=0?'Gotovo':'Sačuvaj')+'</button></span></div>'+
       (hkNapIdx >= 0 ? '<textarea id="hkNap" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" oninput="hkFinSet('+hkNapIdx+',\'napomena\', this.value)">'+escapeHtml(d.fin[hkNapIdx].napomena||'')+'</textarea></div>'
       : '<textarea id="hkNap" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" onfocus="expandHkNap()" onclick="expandHkNap()" oninput="hkSet(\'napomena\', this.value)">'+escapeHtml(d.napomena||'')+'</textarea></div>')+
-    fin+'</div>'+
+    '</div>'+fin+'</div>'+
     '<div class="modal-actions ff-foot cd-foot">'+
     '<button class="home-sq" onclick="hkZakazi()"><span class="sq-box">📅</span>Zakaži</button>'+
     '<button class="home-sq" onclick="hkSwapSeason()"><span class="sq-box">🔄</span>Zamena sezone</button>'+
