@@ -1930,7 +1930,8 @@ function makeStrip(box, o){
       return;
     }
     tapLast = { t:now, x:p.x, y:p.y }; clearTimeout(tapTimer);
-    tapTimer = setTimeout(()=>{ tapTimer = null; tapLast = null; if(o.onTap) o.onTap(); }, 280);
+    /* v51 (Zoran 19.11., isto kao Gde sam ostavio v12): uvećana/okrenuta slika — dodir je prvo vraća u ceo prikaz, tek sledeći dodir = onTap (nazad) */
+    tapTimer = setTimeout(()=>{ tapTimer = null; tapLast = null; if(z.s > 1 || z.r){ zReset(true); return; } if(o.onTap) o.onTap(); }, 280);
   });
   box.addEventListener('touchcancel', ()=>{ if(g && g.m === 'swipe'){ place(0, true); } g = null; });
   /* miš (računar): klik = onTap */
@@ -3563,7 +3564,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 50; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 51; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
