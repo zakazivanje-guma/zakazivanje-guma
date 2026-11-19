@@ -2207,8 +2207,8 @@ function hlToggleSearch(){
   renderHotelList();
   if(hlSearch && qi) qi.focus();
 }
-/* ---------- v49 (Zoran 19.11.) IZVOZ HOTELA U EXCEL: kvadrat Excel → .xlsx u Preuzimanja. Listovi „Hotel“ (red po klijentu,
-   završeni na dnu, sivi) i „Finansije“ (sve uplate, sezona, zbir). Fajl se pravi ovde (OOXML + ZIP bez sažimanja), bez biblioteke. ---------- */
+/* ---------- v49 (Zoran 19.11.) IZVOZ HOTELA U EXCEL: kvadrat Excel → .xlsx u Preuzimanja. v50: izgled kao aplikacija — list „Hotel“
+   po grupama (Sporno, Čekaju, Zamenjeno, Završeno), list „Finansije“ po klijentu (sezone u boji, zbir klijenta, sve ukupno). Fajl se pravi ovde (OOXML + ZIP bez sažimanja), bez biblioteke. ---------- */
 const CRC_T = (()=>{ const t = new Uint32Array(256); for(let n=0;n<256;n++){ let c = n; for(let k=0;k<8;k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
 function crc32(b){ let c = 0xFFFFFFFF; for(let i=0;i<b.length;i++) c = CRC_T[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
 function zipStore(files){   /* files: [{name, data:string}] → Uint8Array ZIP (metoda 0) */
@@ -2229,50 +2229,95 @@ function zipStore(files){   /* files: [{name, data:string}] → Uint8Array ZIP (
 }
 const xEsc = v=> String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'');
 function xColName(i){ let s = ''; i++; while(i){ const m = (i-1) % 26; s = String.fromCharCode(65+m) + s; i = Math.floor((i-1)/26); } return s; }
-/* stilovi: 0 obično, 1 zaglavlje, 2 broj #,##0, 3 sivo (završeno), 4 sivi broj, 5 crveno podebljano (sporno), 6 podebljan zbir */
-function xSheet(rows, widths, style){
-  const xml = rows.map((r,ri)=>'<row r="'+(ri+1)+'"'+(ri===0?' ht="30" customHeight="1"':'')+'>'+r.map((v,ci)=>{
-    const ref = xColName(ci)+(ri+1), st = style(ri, ci, v);
-    if(v === null || v === undefined || v === '') return st ? '<c r="'+ref+'" s="'+st+'"/>' : '';
-    if(typeof v === 'object' && v.f) return '<c r="'+ref+'" s="'+st+'"><f>'+xEsc(v.f)+'</f></c>';
-    if(typeof v === 'number') return '<c r="'+ref+'" s="'+st+'"><v>'+v+'</v></c>';
-    return '<c r="'+ref+'" s="'+st+'" t="inlineStr"><is><t xml:space="preserve">'+xEsc(v)+'</t></is></c>';
+/* v50 (Zoran 19.11., predlog „to je to“): izgled kao aplikacija — grupe, boje, okviri; stilovi se slažu po potrebi */
+function xStyles(){
+  const fonts = [], fills = ['<fill><patternFill patternType="none"/></fill>', '<fill><patternFill patternType="gray125"/></fill>'], xfs = [], idx = {};
+  const fI = f=>{ const x = '<font>'+(f.b?'<b/>':'')+'<sz val="'+(f.sz||11)+'"/><color rgb="FF'+(f.c||'2B2B2B')+'"/><name val="Calibri"/></font>'; let i = fonts.indexOf(x); if(i < 0){ fonts.push(x); i = fonts.length-1; } return i; };
+  const flI = c=>{ if(!c) return 0; const x = '<fill><patternFill patternType="solid"><fgColor rgb="FF'+c+'"/><bgColor indexed="64"/></patternFill></fill>'; let i = fills.indexOf(x); if(i < 0){ fills.push(x); i = fills.length-1; } return i; };
+  const st = o=>{ o = o || {}; const k = JSON.stringify(o); if(idx[k] !== undefined) return idx[k];
+    const al = '<alignment vertical="center"'+(o.ha?' horizontal="'+o.ha+'"':'')+'/>';
+    xfs.push('<xf numFmtId="'+(o.num?164:0)+'" fontId="'+fI(o)+'" fillId="'+flI(o.bg)+'" borderId="'+(o.box?1:0)+'" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"'+(o.num?' applyNumberFormat="1"':'')+'>'+al+'</xf>');
+    return idx[k] = xfs.length-1; };
+  st({});
+  const xml = ()=> '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+    '<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts><fonts count="'+fonts.length+'">'+fonts.join('')+'</fonts><fills count="'+fills.length+'">'+fills.join('')+'</fills>'+
+    '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFD9CFB4"/></left><right style="thin"><color rgb="FFD9CFB4"/></right><top style="thin"><color rgb="FFD9CFB4"/></top><bottom style="thin"><color rgb="FFD9CFB4"/></bottom><diagonal/></border></borders>'+
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="'+xfs.length+'">'+xfs.join('')+'</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+  return { st, xml };
+}
+/* sheet: rows = [{ c:[{v|f, s}], h }], merges = ['A1:O1'], widths, freeze = 'C3' */
+function xSheet(sh){
+  const xml = sh.rows.map((r,ri)=>'<row r="'+(ri+1)+'"'+(r.h?' ht="'+r.h+'" customHeight="1"':'')+'>'+(r.c||[]).map((c,ci)=>{
+    if(!c) return ''; const ref = xColName(ci)+(ri+1), st = ' s="'+(c.s||0)+'"', v = c.v;
+    if(c.f) return '<c r="'+ref+'"'+st+'><f>'+xEsc(c.f)+'</f></c>';
+    if(v === null || v === undefined || v === '') return '<c r="'+ref+'"'+st+'/>';
+    if(typeof v === 'number') return '<c r="'+ref+'"'+st+'><v>'+v+'</v></c>';
+    return '<c r="'+ref+'"'+st+' t="inlineStr"><is><t xml:space="preserve">'+xEsc(v)+'</t></is></c>';
   }).join('')+'</row>').join('');
+  const fr = /^([A-Z]+)(\d+)$/.exec(sh.freeze), xs = fr ? fr[1].charCodeAt(0)-65 : 0, ys = fr ? +fr[2]-1 : 0;
   return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
-    '<sheetViews><sheetView workbookViewId="0"><pane xSplit="2" ySplit="1" topLeftCell="C2" activePane="bottomRight" state="frozen"/></sheetView></sheetViews>'+
-    '<cols>'+widths.map((w,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>').join('')+'</cols><sheetData>'+xml+'</sheetData></worksheet>';
+    '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView showGridLines="0" workbookViewId="0">'+(fr ? '<pane'+(xs?' xSplit="'+xs+'"':'')+' ySplit="'+ys+'" topLeftCell="'+sh.freeze+'" activePane="'+(xs?'bottomRight':'bottomLeft')+'" state="frozen"/>' : '')+'</sheetView></sheetViews>'+
+    '<cols>'+sh.widths.map((w,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>').join('')+'</cols><sheetData>'+xml+'</sheetData>'+
+    (sh.merges.length ? '<mergeCells count="'+sh.merges.length+'">'+sh.merges.map(m=>'<mergeCell ref="'+m+'"/>').join('')+'</mergeCells>' : '')+
+    '<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="'+(sh.land?'landscape':'portrait')+'" fitToWidth="1" fitToHeight="0"/></worksheet>';
 }
 function hotelXlsx(){
-  const FEL = { alu:'Alu', celik:'Čelik' }, KOD = { letnje:'Letnje', zimske:'Zimske' };
-  const byN = (a,c)=> (parseInt(a.mesto,10)||9999) - (parseInt(c.mesto,10)||9999);
-  const L = hotel.filter(hotelAktivan).sort(byN).concat(hotel.filter(h=>!hotelAktivan(h)).sort(byN));
+  const S = xStyles(), st = S.st, DARK = '2F4A3A', BAND = 'D9C99A', CARD = 'FFFDF7', ZEB = 'F7F1E3', DIM = '8A8070';
+  const FEL = { alu:'Alu', celik:'Čelik' }, KOD = { letnje:'letnje', zimske:'zimske' }, KODBG = { letnje:'FBEFD0', zimske:'DCE6F2' };
+  const byN = (a,c)=> (parseInt(a.mesto,10)||9999) - (parseInt(c.mesto,10)||9999) || String(a.mesto).localeCompare(String(c.mesto));
   const num = v=>{ const n = parseInt(v,10); return String(n) === String(v).trim() ? n : (v||''); };
-  const H = [['Mesto','Ime i prezime','Telefon','Adresa','Auto','Registracija','Letnje dimenzija','Letnje brend','Letnje felna','Zimske dimenzija','Zimske brend','Zimske felna','Kod nas su','Status','U hotelu od','Cena mesečno','Poslednja zamena','Uplaćeno ukupno','Napomena']];
-  L.forEach(h=>{ const R = hotelRedovi(h), tot = R.reduce((a,r)=>a+(normIznos(r.hotel)||0)+(normIznos(r.zamena)||0), 0), z = hotelZadnjaZamena(h);
-    H.push([num(h.mesto), h.ime||'', h.telefon||'', h.adresa||'', h.auto||'', h.tablica||'', h.dimL||'', h.letnje||'', FEL[h.felnaL]||'', h.dimZ||'', h.zimske||'', FEL[h.felnaZ]||'',
-      KOD[h.kod]||'Ništa', (H_STATUS[h.status]||h.status||'').replace(/^[⚠✓]\s*/,''), h.od ? dmyShort(h.od) : '', normIznos(h.cena)||'', z ? dmyShort(z) : '', tot, h.napomena||'']); });
-  const F = [['Mesto','Ime i prezime','Datum','Sezona','Hotel','Zamena','Ukupno','Napomena']], fr = [];
-  L.forEach(h=> hotelRedovi(h).forEach(r=> fr.push([h, r])));
-  fr.sort((a,b)=> byN(a[0], b[0]) || String(a[1].datum).localeCompare(String(b[1].datum)));
-  fr.forEach(([h,r])=>{ const hi = normIznos(r.hotel)||0, zi = normIznos(r.zamena)||0;
-    F.push([num(h.mesto), h.ime||'', dmyShort(r.datum), /^\d{4}-\d{2}-\d{2}$/.test(r.datum||'') ? sezona(r.datum).naziv : '', hi, zi, hi+zi, r.napomena||'']); });
-  const n = F.length;
-  F.push(['', 'UKUPNO', '', '', {f:'SUM(E2:E'+n+')'}, {f:'SUM(F2:F'+n+')'}, {f:'SUM(G2:G'+n+')'}, '']);
-  const done = new Set(); H.forEach((r,i)=>{ if(i && r[13] === 'Završeno') done.add(i); });
-  const s1 = xSheet(H, [7,22,15,24,18,13,12,12,9,12,12,9,11,11,12,10,13,12,40], (ri, ci, v)=>{
-    if(ri === 0) return 1; const nb = ci === 15 || ci === 17;
-    if(done.has(ri)) return nb ? 4 : 3; if(ci === 13 && v === 'Sporno') return 5; return nb ? 2 : 0; });
-  const s2 = xSheet(F, [7,22,12,16,10,10,11,45], (ri, ci)=> ri === 0 ? 1 : ri === F.length-1 ? 6 : (ci >= 4 && ci <= 6 ? 2 : 0));
-  const styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
-    '<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts>'+
-    '<fonts count="5"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><sz val="11"/><color rgb="FF8A8070"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFC0392B"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>'+
-    '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF2F4A3A"/><bgColor indexed="64"/></patternFill></fill></fills>'+
-    '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
-    '<cellXfs count="7"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'+
-    '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>'+
-    '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+
-    '<xf numFmtId="164" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyNumberFormat="1"/><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+
-    '<xf numFmtId="164" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+  const sz = sezona(), dan = dmyShort(todayISO()), uk = h=> hotelRedovi(h).reduce((a,r)=>a+(normIznos(r.hotel)||0)+(normIznos(r.zamena)||0), 0);
+  const akt = hotel.filter(hotelAktivan).sort(byN);
+  const GR = [
+    ['⚠ SPORNO', 'C0392B', 'E9C3BD', 'FBE3E0', akt.filter(h=>h.status==='sporno')],
+    ['ČEKAJU ZAMENU', '8A6D3B', BAND, 'F6EBD3', akt.filter(h=>h.status==='aktivan' && !hotelZamenjeno(h))],
+    ['✓ ZAMENJENO OVE SEZONE', '2E7D32', BAND, 'DCEBDC', akt.filter(h=>h.status==='aktivan' && hotelZamenjeno(h))],
+    ['ZAVRŠENO — GUME VIŠE NE ČUVAMO', DIM, BAND, 'ECE8DF', hotel.filter(h=>!hotelAktivan(h)).sort(byN)]
+  ];
+  /* list Hotel */
+  const C1 = ['Br.','Ime i prezime','Telefon','Auto','Registracija','☀️ Letnje','Felna','❄️ Zimske','Felna','Kod nas','Poslednja zamena','Cena/mes.','Uplaćeno','Adresa','Napomena'], n1 = C1.length, L1 = xColName(n1-1);
+  const R1 = [{ h:24, c:[{ v:'🏨 Hotel za gume — Tire Time · stanje '+dan+' · '+sz.ic+' '+sz.naziv, s:st({ b:1, sz:14, c:DARK }) }] },
+              { c: C1.map(t=>({ v:t, s:st({ b:1, c:'FFFFFF', bg:DARK, box:1 }) })) }], M1 = ['A1:'+L1+'1'];
+  GR.forEach(([naz, col, band, tint, L])=>{
+    if(!L.length) return;
+    const bs = st({ b:1, c:col, bg:band }); R1.push({ h:18, c:[{ v:naz+' · '+L.length, s:bs }].concat(Array(n1-1).fill({ s:bs })) }); M1.push('A'+R1.length+':'+L1+R1.length);
+    const dim = naz.startsWith('ZAVRŠENO');
+    L.forEach((h,k)=>{
+      const bg = k % 2 ? ZEB : CARD, t = { c: dim ? DIM : '2B2B2B', bg, box:1 }, z = hotelZadnjaZamena(h);
+      const dimT = (d,b)=> [d, b].filter(Boolean).join(' · ');
+      R1.push({ h:20, c:[
+        { v:num(h.mesto), s:st({ b:1, sz:13, c:col, bg:tint, box:1, ha:'center' }) }, { v:h.ime||'', s:st(Object.assign({ b:1 }, t)) },
+        { v:h.telefon||'', s:st(t) }, { v:h.auto||'', s:st(t) }, { v:h.tablica||'', s:st(t) },
+        { v:dimT(h.dimL, h.letnje), s:st(t) }, { v:FEL[h.felnaL]||'', s:st(t) }, { v:dimT(h.dimZ, h.zimske), s:st(t) }, { v:FEL[h.felnaZ]||'', s:st(t) },
+        { v:KOD[h.kod]||'ništa', s:st({ c: dim ? DIM : '2B2B2B', bg: KODBG[h.kod]||'ECE8DF', box:1, ha:'center' }) },
+        { v: z ? dmyShort(z) : '', s:st(t) }, { v: normIznos(h.cena)||'', s:st(Object.assign({ num:1 }, t)) }, { v: uk(h), s:st(Object.assign({ num:1 }, t)) },
+        { v:h.adresa||'', s:st(t) }, { v:h.napomena||'', s:st(t) } ] });
+    });
+  });
+  /* list Finansije — po klijentu, kao u kartici: zimske uplate plave, letnje žute, zbir klijenta, pa sve ukupno */
+  const C2 = ['Datum','Sezona','Hotel','Zamena','Ukupno','Napomena'];
+  const R2 = [{ h:24, c:[{ v:'🏨 Hotel za gume — finansije po klijentu · stanje '+dan, s:st({ b:1, sz:14, c:DARK }) }] },
+              { c: C2.map(t=>({ v:t, s:st({ b:1, c:'FFFFFF', bg:DARK, box:1 }) })) }], M2 = ['A1:F1'], sub = [];
+  akt.concat(hotel.filter(h=>!hotelAktivan(h)).sort(byN)).forEach(h=>{
+    const R = hotelRedovi(h); if(!R.length) return;
+    const hs = st({ b:1, sz:12, c:DARK, bg:BAND });
+    R2.push({ h:20, c:[{ v:[h.mesto, h.ime, h.auto, h.tablica].filter(Boolean).join(' · ')+(hotelAktivan(h) ? '' : ' · završeno'), s:hs }].concat(Array(5).fill({ s:hs })) }); M2.push('A'+R2.length+':F'+R2.length);
+    const p = R2.length + 1;
+    R.forEach(r=>{
+      const ok = /^\d{4}-\d{2}-\d{2}$/.test(r.datum||''), se = ok ? sezona(r.datum) : null, zim = se && se.tip === 'zimska';
+      const bg = zim ? 'E3ECF6' : 'FBF0D2', t = { bg, box:1 }, i = R2.length + 1;
+      R2.push({ c:[ { v:dmyShort(r.datum), s:st(t) }, { v: se ? se.ic+' '+se.naziv : '', s:st({ b:1, c: zim ? '2C5D8F' : '9A6B00', bg, box:1 }) },
+        { v:normIznos(r.hotel)||0, s:st(Object.assign({ num:1 }, t)) }, { v:normIznos(r.zamena)||0, s:st(Object.assign({ num:1 }, t)) },
+        { f:'C'+i+'+D'+i, s:st(Object.assign({ num:1 }, t)) }, { v:r.napomena||'', s:st(t) } ] });
+    });
+    const q = R2.length, bt = { b:1, bg:CARD, box:1 }, bn = st({ b:1, bg:CARD, box:1, num:1 });
+    R2.push({ c:[ { s:st(bt) }, { v:'Ukupno '+String(h.ime||'').split(' ')[0], s:st(bt) }, { f:'SUM(C'+p+':C'+q+')', s:bn }, { f:'SUM(D'+p+':D'+q+')', s:bn }, { f:'SUM(E'+p+':E'+q+')', s:bn }, { s:st(bt) } ] });
+    sub.push(R2.length); R2.push({ c:[] });
+  });
+  const tt = { b:1, sz:12, c:'FFFFFF', bg:DARK }, tn = st(Object.assign({ num:1 }, tt));
+  R2.push({ h:20, c:[ { s:st(tt) }, { v:'SVE UKUPNO', s:st(tt) } ].concat('CDE'.split('').map(L=>({ f: sub.length ? sub.map(r=>L+r).join('+') : '0', s:tn })), [{ s:st(tt) }]) });
+  const s1 = xSheet({ rows:R1, merges:M1, widths:[6,22,14,17,13,24,8,24,8,10,13,10,11,24,40], freeze:'C3', land:1 });
+  const s2 = xSheet({ rows:R2, merges:M2, widths:[13,26,11,11,12,60], freeze:'A3' });
   const ns = 'http://schemas.openxmlformats.org/', P = ns+'package/2006/', O = ns+'officeDocument/2006/';
   return zipStore([
     { name:'[Content_Types].xml', data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="'+P+'content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'+
@@ -2281,7 +2326,7 @@ function hotelXlsx(){
     { name:'_rels/.rels', data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="'+P+'relationships"><Relationship Id="rId1" Type="'+O+'relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
     { name:'xl/workbook.xml', data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="'+ns+'spreadsheetml/2006/main" xmlns:r="'+O+'relationships"><sheets><sheet name="Hotel" sheetId="1" r:id="rId1"/><sheet name="Finansije" sheetId="2" r:id="rId2"/></sheets></workbook>' },
     { name:'xl/_rels/workbook.xml.rels', data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="'+P+'relationships"><Relationship Id="rId1" Type="'+O+'relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="'+O+'relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="'+O+'relationships/styles" Target="styles.xml"/></Relationships>' },
-    { name:'xl/styles.xml', data: styles },
+    { name:'xl/styles.xml', data: S.xml() },
     { name:'xl/worksheets/sheet1.xml', data: s1 },
     { name:'xl/worksheets/sheet2.xml', data: s2 }
   ]);
@@ -5117,7 +5162,7 @@ function openHelpScreen(){
     { t:'Napomena', c:'Napomena je poslednje polje i zauzima ostatak ekrana. Dodir na nju otvara je preko celog ekrana, kao beležnicu: gore ‹ ↶ ↷ Sačuvaj. Sačuvaj ili korak nazad čuvaju SAMO napomenu i vraćaju termin; ako si promenio i nešto drugo, dole Sačuvaj ostaje upaljeno dok i to ne sačuvaš (nov termin čuva napomenu kad ga sačuvaš).' },
     { t:'Zauzeti sati', c:'U panelu „U koliko sati?“ sat u kome tog dana već ima zakazan termin je obojen i ima mali broj termina u uglu. Kad izabereš sat, ispod minuta piše ime klijenta koji je u to vreme, a ispod je spisak svih termina tog sata. Zauzeto može i dalje da se izabere (dva auta u isto vreme).' },
     { t:'Telefon i SMS', c:'Na kartici je broj napisan čitljivo (063 880 8260). U terminu: kad je broj upisan, 📞 zove klijenta, a 💬 otvara Poruke sa gotovim podsetnikom („Poštovani, podsećamo Vas na termin za zamenu guma sutra u 12:00. Tire Time“) — samo dodirneš Pošalji. Kad broja nema, 📞 otvara Telefon (da prepišeš broj iz poziva), a 📋 nalepi kopirani broj.' },
-    { t:'Hotel za gume', c:'Kvadrat 🏨 Hotel otvara spisak klijenata čije gume čuvaš, po grupama: ⚠ Sporno (crveno, npr. nije došao na zamenu), Čekaju zamenu (broj u boji polja vremena) i ✓ Zamenjeno ove sezone (zeleno). Gore su kvadrati kao na početnom ekranu: Novi (nov hotel klijent), Pretraži (otvara polje za pretragu) i Završeno (klijenti čije gume više ne čuvamo, po mesecima; ponovni dodir ili korak nazad vraća spisak) i Excel (ceo hotel u Excel fajl u Preuzimanjima: list Hotel — red po klijentu, list Finansije — sve uplate sa zbirom). Prevuci klijenta udesno → Završeno: ide u Završeno, a njegovo mesto je slobodno. U Završenom prevuci udesno → Vrati u hotel (ako je mesto u međuvremenu zauzeto, otvori se kartica da upišeš novo). Ispod kvadrata piše sezona (zimska 1.10.–kraj februara, letnja 1.3.–30.9.) i koliko je zamenjeno. Broj u kvadratu je mesto gde su gume. Pretraga po imenu, registraciji, dimenziji, brendu, adresi ili broju. Dodavanje: kvadrat Novi → izaberi klijenta iz termina (ili prazna kartica); ili u otvorenom terminu dugme „🏨 U hotel“ na slici; ili dugi pritisak na termin → 🏨 U hotel za gume. Uklanjanje: prevuci klijenta u spisku ulevo → Izbriši (pita pre brisanja) — kartica ide u korpu (Podešavanja → Korpa), odakle se vraća dugmetom Vrati, sa svim podacima i starim redovima.' },
+    { t:'Hotel za gume', c:'Kvadrat 🏨 Hotel otvara spisak klijenata čije gume čuvaš, po grupama: ⚠ Sporno (crveno, npr. nije došao na zamenu), Čekaju zamenu (broj u boji polja vremena) i ✓ Zamenjeno ove sezone (zeleno). Gore su kvadrati kao na početnom ekranu: Novi (nov hotel klijent), Pretraži (otvara polje za pretragu) i Završeno (klijenti čije gume više ne čuvamo, po mesecima; ponovni dodir ili korak nazad vraća spisak) i Excel (ceo hotel u Excel fajl u Preuzimanjima, uređen kao aplikacija: list Hotel po grupama Sporno / Čekaju zamenu / Zamenjeno / Završeno, list Finansije po klijentu sa sezonama u boji i zbirom; fajl deliš iz programa kojim ga otvaraš — Pošalji kao datoteku — ili iz Preuzimanja). Prevuci klijenta udesno → Završeno: ide u Završeno, a njegovo mesto je slobodno. U Završenom prevuci udesno → Vrati u hotel (ako je mesto u međuvremenu zauzeto, otvori se kartica da upišeš novo). Ispod kvadrata piše sezona (zimska 1.10.–kraj februara, letnja 1.3.–30.9.) i koliko je zamenjeno. Broj u kvadratu je mesto gde su gume. Pretraga po imenu, registraciji, dimenziji, brendu, adresi ili broju. Dodavanje: kvadrat Novi → izaberi klijenta iz termina (ili prazna kartica); ili u otvorenom terminu dugme „🏨 U hotel“ na slici; ili dugi pritisak na termin → 🏨 U hotel za gume. Uklanjanje: prevuci klijenta u spisku ulevo → Izbriši (pita pre brisanja) — kartica ide u korpu (Podešavanja → Korpa), odakle se vraća dugmetom Vrati, sa svim podacima i starim redovima.' },
     { t:'Hotel kartica', c:'Redom: Ime i prezime | Adresa, Telefon | Mesto (broj gde su gume), Auto | Registracija; zatim žuti okvir ☀️ Letnje i plavi ❄️ Zimske — svaki sa Dimenzija | Brend | Felna (dimenziju kucaš samo ciframa na brojevnoj tastaturi, npr. 2156517 → 215/65 R17; dodir na Alu ili Čelik označi kvačicom, ponovni dodir skida; bez oznake = bez felne); pa Status (Aktivan, ⚠ Sporno, ✓ Završeno), „Kod nas su: letnje / zimske / ništa“, U hotelu od | Cena mesečno i Napomena. Gore su slike auta, iste kao u terminima: 📷 Slikaj i 🖼️ Galerija dodaju slike direktno u kartici, dodir na sliku otvara pregled (★ profilna, 🗑 briše); sve se čuva dugmetom Sačuvaj. Polja rade kao u terminu: dodir isprazni polje, a stari tekst se vidi osenčen (kucanje ili diktat upisuje novo, drugi dodir vraća stari tekst za ispravku, Backspace u praznom polju = korak nazad u prethodno polje, strelica na tastaturi = sledeće polje). Napomena se otvara preko celog ekrana kao u terminu (↶ ↷ Sačuvaj; nazad čuva samo napomenu, ostale izmene čekaju Sačuvaj). Ispod su finansije: zbir hotel, zamena i ukupno; redovi su po sezonama (traka sa nazivom sezone i zbirom; zima plavo, leto žuto, po datumu reda), i svaki red kao polja Datum, Hotel, Zamena i Napomena — dodir na polje i menjaš direktno, zbir se odmah preračuna; ＋ Dodaj red dodaje nov red na vrh; prevuci red ulevo → Izbriši (↶ vraća, konačno tek na Sačuvaj). Red sa oznakom „📅 iz termina“ je završen termin: izmena tu menja i taj termin (iznos = hotel + zamena), a briše se u Završenom. Dole: 📅 Zakaži (kartica se sačuva, pa kalendar i sat, pa nov termin sa podacima kartice — upisuje se na Sačuvaj), Zamena sezone (letnje ↔ zimske; red u finansije upisuješ sam), Otkaži, Sačuvaj.' },
     { t:'Termin hotel klijenta', c:'Na kartici na početnom ekranu pored imena piše 🏨 i broj (⚠ ako je sporno). U terminu je traka „Hotel br. … · kod nas: …“ — dodir otvara hotel karticu. Iznos je podeljen: Zamena + Hotel = Ukupno; Hotel se sam predloži (meseci od prošle zamene × cena), a možeš ga promeniti. Kad termin prevučeš u Završeno, klijent prelazi u „zamenjeno ove sezone“, a kod nas se okrene (posle zimske zamene: letnje). Ako termin vratiš iz Završenog, vrati se i to.' },
     { t:'Nesačuvana izmena', c:'Ako u terminu nešto promeniš pa ga zatvoriš bez čuvanja (✕, Otkaži, dodir van ili korak nazad), aplikacija pita „Sačuvati izmene?“: Sačuvaj čuva, Otkaži izmene zatvara termin bez promene. Dodir van prozora ili korak nazad vraća u termin.' },
