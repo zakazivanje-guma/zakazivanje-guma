@@ -1096,6 +1096,10 @@ body.noting .vw-screen, body.noting .cam-screen{ top:var(--note-h); }
 .hl .hs-sec{ margin:18px 0 0; padding:10px 14px; border:1.5px solid color-mix(in srgb, var(--text) 18%, var(--line)); border-bottom:none; border-radius:16px 16px 0 0; background:var(--pearl); }
 .hl .hl-grp{ background:var(--fin-band); border-radius:0 0 18px 18px; padding:12px 6px 2px; margin-bottom:6px; }
 .hl .hl-row{ border-style:solid; border-width:1.5px 1.5px 1.5px 7px; border-top-color:color-mix(in srgb, var(--text) 14%, var(--line)); border-right-color:color-mix(in srgb, var(--text) 14%, var(--line)); border-bottom-color:color-mix(in srgb, var(--text) 14%, var(--line)); margin:0 0 12px; box-shadow:0 2px 7px rgba(43,43,36,.12); }
+/* v55 (Zoran 20.11.): ↶ ↷ veći; aktivno dugme tamno ispunjeno, neaktivno bledo bez pozadine (važi za termin, hotel karticu i napomenu) */
+.cd-undo{ width:52px; height:46px; border-radius:13px; font-size:27px; font-weight:700; line-height:1; transition:background .15s, opacity .15s; }
+.cd-undo:not(.dim){ background:var(--green-deep); border:1.5px solid var(--green-deep); color:var(--on-accent); box-shadow:0 2px 6px rgba(40,64,47,.3); opacity:1; }
+.cd-undo.dim{ background:transparent; border:1.5px dashed var(--line); color:var(--text-dim); box-shadow:none; opacity:.45; }
 
 /* v45 (Zoran 18.11.): kvadrat sa brojem i bočna traka kao polje vremena na terminu (sporno ostaje crveno, na čekanju bledo) */
 .hl .hl-row, .hl .hl-row.ok{ border-left-color:var(--green-pale); }
