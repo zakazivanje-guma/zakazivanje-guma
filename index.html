@@ -1054,6 +1054,32 @@ body.noting .vw-screen, body.noting .cam-screen{ top:var(--note-h); }
 .hk .hk-sez.l{ background:var(--sez-l); } .hk .hk-sez.z{ background:var(--sez-z); }
 .hl .hs-season, .hl .hl-q, .hl .hl-new{ background:var(--pearl); }
 
+/* v52 (Zoran 19.11.): finansije jasnije — ukupni iznosi istaknuti, kartice redova jasno odvojene (okvir u boji sezone, senka, veći razmak) */
+.hk .sec{ font-size:13.5px; color:var(--green-deep); margin:18px 2px 8px; padding-top:12px; border-top:1.5px solid var(--line); }
+.hk .hk-sum{ gap:7px; margin-bottom:4px; }
+.hk .hk-sum div{ border:1.5px solid color-mix(in srgb, var(--green-deep) 30%, var(--line)); border-radius:13px; padding:8px 10px; box-shadow:0 1px 3px rgba(43,43,36,.08); }
+.hk .hk-sum b{ font-size:18px; font-weight:800; white-space:nowrap; }
+.hk .hk-sum div.uk{ background:var(--green-deep); border-color:var(--green-deep); }
+.hk .hk-sum div.uk small{ color:color-mix(in srgb, var(--on-accent) 75%, transparent); }
+.hk .hk-sum div.uk b{ color:var(--on-accent); }
+.hk .hf-sez{ font-size:14.5px; margin:20px 0 8px; padding:9px 12px; border:1.5px solid; border-radius:12px; }
+.hk .hf-sez b{ font-size:16px; }
+.hk .hf-sez.z{ border-color:var(--sez-z-line); } .hk .hf-sez.l{ border-color:var(--sez-l-line); }
+.hk .hf-row{ border-width:1.5px; border-left-width:7px; border-radius:15px; padding:10px 9px 3px; margin:0 0 16px; box-shadow:0 2px 7px rgba(43,43,36,.12); }
+.hk .hf-row.z{ border-color:var(--sez-z-line); border-left-color:var(--sez-z-bar); background:var(--sez-z); }
+.hk .hf-row.l{ border-color:var(--sez-l-line); border-left-color:var(--sez-l-bar); background:var(--sez-l); }
+.hk .hf-row .field{ border-color:color-mix(in srgb, var(--text) 18%, var(--line)); }
+.hk .hf-row.z .hf-tag{ color:var(--sez-z-t); }
+.hk .hf-row input[id$="_hotel"], .hk .hf-row input[id$="_zamena"]{ font-weight:700; }
+/* v52 predlog 2: tamnija nijansa pozadine oko zbira i kao traka između kartica (samo gde se vidi razmak) */
+.hk{ --fin-band:color-mix(in srgb, var(--text) 13%, var(--bg)); }
+.hk .hk-sum{ background:var(--fin-band); padding:10px; border-radius:16px; }
+.hk .hf-list{ background:var(--fin-band); border-radius:15px; margin-top:16px; }
+.hk .hf-list > :first-child{ margin-top:0; } .hk .hf-list > :last-child{ margin-bottom:0; }
+.hk .hf-list .hf-sez{ margin:0 0 12px; } .hk .hf-list .hf-row{ margin:0 0 12px; }
+.hk .hf-list .hf-row + .hf-sez{ margin-top:0; }
+.hk .hf-add{ margin-top:14px; }
+
 /* v45 (Zoran 18.11.): kvadrat sa brojem i bočna traka kao polje vremena na terminu (sporno ostaje crveno, na čekanju bledo) */
 .hl .hl-row, .hl .hl-row.ok{ border-left-color:var(--green-pale); }
 .hl .hl-n, .hl .hl-row.ok .hl-n{ background:var(--green-pale); color:var(--text); font-family:var(--font-title); font-weight:700; font-size:24px; font-variant-numeric:lining-nums; }
