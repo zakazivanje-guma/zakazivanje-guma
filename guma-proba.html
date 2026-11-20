@@ -90,8 +90,10 @@ function smanji(file, max, q){
 }
 async function pitaj(dataUrl){
   const parts = [{ inlineData:{ mimeType:'image/jpeg', data: dataUrl.split(',')[1] } }, { text:'Pročitaj gumu sa slike.' }];
-  const gcs = [ { responseMimeType:'application/json', responseJsonSchema: SCHEMA, maxOutputTokens: 600 },
-                { responseMimeType:'application/json', maxOutputTokens: 600 } ];
+  /* ispravka 20.11.: limit važi za razmišljanje + odgovor zajedno (zvanična dokumentacija) — 600 je kod jačeg modela sekao JSON */
+  const think = MODEL==='gemini-3.6-flash' ? { thinkingConfig:{ thinkingLevel:'low' } } : {};
+  const gcs = [ Object.assign({ responseMimeType:'application/json', responseJsonSchema: SCHEMA, maxOutputTokens: 4096 }, think),
+                Object.assign({ responseMimeType:'application/json', maxOutputTokens: 4096 }, think) ];
   let last = '';
   for(const gc of gcs){
     const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+MODEL+':generateContent',
@@ -100,8 +102,9 @@ async function pitaj(dataUrl){
     const txt = await r.text();
     if(!r.ok){ last = r.status+' '+txt.slice(0,300); if(r.status===400 && !/API key/i.test(txt)) continue; throw new Error(last); }
     const j = JSON.parse(txt), c = j.candidates && j.candidates[0];
-    const raw = c && c.content && c.content.parts && c.content.parts.map(p=>p.text||'').join('') || '';
-    return JSON.parse(raw.replace(/^```(json)?|```$/g,'').trim());
+    const raw = c && c.content && c.content.parts && c.content.parts.filter(p=>!p.thought).map(p=>p.text||'').join('') || '';
+    try{ return JSON.parse(raw.replace(/^```(json)?|```$/g,'').trim()); }
+    catch(e){ throw new Error('odgovor nepotpun (finishReason: '+((c && c.finishReason) || '?')+')'); }
   }
   throw new Error(last || 'Gemini nije odgovorio.');
 }
@@ -141,10 +144,10 @@ async function uzmi(inp){
     try{
       x.slika = await smanji(f, 1600, 0.88);
       div.innerHTML = '<img src="'+x.slika+'"><div class="mal" style="margin-top:8px">Čitam… ('+MODEL+')</div>';
-      const t0 = performance.now();
+      x.t0 = performance.now();
       x.r = await pitaj(x.slika);
-      x.ms = performance.now() - t0;
     }catch(e){ x.greska = (e && e.message) || String(e); }
+    if(x.t0) x.ms = performance.now() - x.t0;
     crtaj(x);
   }
 }
