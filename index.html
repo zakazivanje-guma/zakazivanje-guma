@@ -1110,11 +1110,11 @@ body.noting .vw-screen, body.noting .cam-screen{ top:var(--note-h); }
 .zf .field.hk-adr.open textarea{ white-space:pre-wrap; word-break:break-word; }
 .zf .field.hk-adr textarea.pre-sel{ background:color-mix(in srgb, var(--green-deep) 20%, transparent) !important; }
 /* v58 (Zoran 20.11.): ↶ ↷ u redu PODACI; u zaglavlju 🤖 AI prekidač; godina gume (DOT) u zaglavlju okvira sezone; polja koja je AI upisao — zeleni okvir */
-.zf .cd-foot.hk-foot, .zf .cd-foot{ position:relative; }
-.hk-urfloat{ position:absolute; left:50%; top:-74px; display:flex; gap:8px; padding:6px; border-radius:16px; background:color-mix(in srgb, var(--pearl) 70%, transparent); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); box-shadow:0 4px 14px rgba(43,43,36,.22); opacity:0; transform:translate(-50%, 8px); pointer-events:none; transition:opacity .2s, transform .2s; z-index:8; }
-.hk-urfloat.show{ opacity:1; transform:translate(-50%, 0); pointer-events:auto; }
-.hk-urfloat .cd-undo{ width:84px; height:52px; font-size:30px; }   /* široko — da se ne promaši */
-.hk .zf-body, #formBackdrop .zf-body{ padding-bottom:80px; }   /* poslednje dugme (+ Dodaj red) može da se skroluje iznad ↶ ↷ */
+.zf .cd-foot .ft-std{ display:contents; }
+.zf .cd-foot .ft-ur{ display:none; flex:3 1 0; gap:8px; padding:0 6px 0 2px; align-items:flex-start; }
+.zf .cd-foot.urmode .ft-std{ display:none; }
+.zf .cd-foot.urmode .ft-ur{ display:flex; }
+.zf .cd-foot .ft-ur .cd-undo{ flex:1; width:auto; height:54px; border-radius:14px; font-size:32px; }
 .hk-ai{ display:flex; align-items:center; gap:5px; height:46px; padding:0 13px; margin-left:auto; margin-right:10px; border-radius:13px; font:inherit; font-size:15px; font-weight:800; border:1.5px solid var(--green-deep); background:var(--green-deep); color:var(--on-accent); box-shadow:0 2px 6px rgba(40,64,47,.3); }
 .hk-ai:not(.on){ background:transparent; border:1.5px dashed var(--line); color:var(--text-dim); box-shadow:none; }
 .hk-ai.busy{ animation:hkAiPuls 1s ease-in-out infinite; }
@@ -2504,7 +2504,7 @@ function openHotelCard(id, fromTermin){
   const h = id ? hotel.find(x=>x.id===id) : null;
   const src = fromTermin || null;
   hkId = h ? h.id : null;
-  hkAiMarks = new Set();
+  hkAiMarks = new Set(); urEdit.hk = false; urSig.hk = '';
   hkDraft = h ? Object.assign({}, h, { cena: String(h.cena||'') })
     : { mesto: String(hotelNextMesto()), ime: src ? src.ime||'' : '', telefon: src ? src.telefon||'' : '', auto: src ? src.auto||'' : '', tablica: src ? src.tablica||'' : '',
         adresa:'', cena: String(hotelCena()), dimL:'', dimZ:'', felnaL:'', felnaZ:'', letnje:'', zimske:'', od: todayISO(), kod: sezona().tip==='zimska' ? 'letnje' : 'zimske', status:'aktivan', napomena:'', vozilo: src ? src.vozilo||'' : '' };
@@ -2559,7 +2559,7 @@ function hkBar(){
   document.querySelectorAll('#hkBackdrop .f-undo').forEach(u=>u.classList.toggle('dim', !hkHist || (hkHist.i <= 0 && !p)));
   document.querySelectorAll('#hkBackdrop .f-redo').forEach(r=>r.classList.toggle('dim', !hkHist || p || hkHist.i >= hkHist.s.length-1));
   const s = document.getElementById('hkSave'); if(s) s.classList.toggle('dim', !!hkId && hkKey() === hkOrig);
-  const ur = document.getElementById('hkUr'); if(ur) ur.classList.toggle('show', !!hkHist && (p || hkHist.i > 0 || hkHist.i < hkHist.s.length-1));
+  urSync('hk');
   const ns = document.getElementById('hkNapSave'); if(ns) ns.classList.toggle('dim', !hkNapDirty());
 }
 /* v42 (Zoran 17.11.): polja hotel kartice rade kao u terminu — modul gboard-backspace (prazno + stari tekst osenčen, Backspace =
@@ -2650,11 +2650,11 @@ function renderHotelCard(){
       : '<textarea id="hkNap" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" onfocus="expandHkNap()" onclick="expandHkNap()" oninput="hkSet(\'napomena\', this.value)">'+escapeHtml(d.napomena||'')+'</textarea></div>')+
     '</div>'+fin+'</div>'+
     '<div class="modal-actions ff-foot cd-foot hk-foot">'+
-    /* v58 (Zoran 20.11.): ↶ ↷ plutaju providno iznad donjeg reda — vide se samo kad ima šta da se vrati, ne odlaze sa skrolom */
-    '<div class="hk-urfloat" id="hkUr">'+UR+'</div>'+
+    /* v59 (Zoran 21.11.): dok menjaš, Slikaj/Galerija/Zakaži se zamene širokim ↶ ↷ u istom redu (ništa ne prekrivaju) */
+    '<span class="ft-std">'+
     '<button class="home-sq" onclick="openCamera()"><span class="sq-box">📷</span>Slikaj</button>'+
     '<button class="home-sq" onclick="pickGallery()"><span class="sq-box">🖼️</span>Galerija</button>'+
-    '<button class="home-sq" onclick="hkZakazi()"><span class="sq-box">📅</span>Zakaži</button>'+
+    '<button class="home-sq" onclick="hkZakazi()"><span class="sq-box">📅</span>Zakaži</button></span>'+'<span class="ft-ur" onmousedown="event.preventDefault()">'+UR+'</span>'+
     '<button class="home-sq" onclick="hkSwapSeason()"><span class="sq-box">🔄</span>Zamena sezone</button>'+
     '<button class="home-sq" onclick="closeHotelCard()"><span class="sq-box">✕</span>Otkaži</button>'+
     '<button class="home-sq cd-save" id="hkSave" onclick="saveHotelCard()"><span class="sq-box">✓</span>Sačuvaj</button></div></div>';
@@ -2663,7 +2663,7 @@ function renderHotelCard(){
   hkAiMarks.forEach(k=>{ const el = document.getElementById('hk_'+k), f = el && el.closest('.field, .hk-god'); if(f) f.classList.add('ai-fill'); });   /* v58 */
   const cb = document.getElementById('hkPic'), pics = hkPics();
   if(cb && pics.length) makeStrip(cb.querySelector('.sw-strip'), { idx:Math.min(hkPicIdx, pics.length-1), zoom:false,
-    onIdx:(i)=>{ hkPicIdx = i; const c = document.getElementById('hkCnt'); if(c) c.textContent = (i+1)+' / '+pics.length; }, onTap:()=>openViewer(hkPicIdx) });
+    onIdx:(i)=>{ hkPicIdx = i; const c = document.getElementById('hkCnt'); if(c) c.textContent = (i+1)+' / '+pics.length; }, onTap:()=>{ urEnd('hk'); openViewer(hkPicIdx); } });
 }
 /* v41 (Zoran 17.11.): slike auta u hotel kartici — iste kao u terminima (slike pripadaju vozilu); dodir = pregled preko celog ekrana.
    Slike se dodaju u terminu (Slikaj / Galerija). */
@@ -2677,6 +2677,27 @@ function hkVozilo(){
   return vid || '';
 }
 function hkPics(){ return hkDraft ? (hkDraft.slike || []) : []; }
+/* v59 (Zoran 21.11.): ↶ ↷ u donjem redu umesto Slikaj/Galerija/Zakaži (termin: /Obriši) dok traje izmena.
+   Izmena počinje: fokus na polje ili bilo koja promena (kucanje, dugme, AI upis, slika). Završava se: izlaz iz polja (tastatura
+   se zatvori) ili dodir na sliku. Red se menja samo ako ima šta da se vrati/ponovi. Dodir na ↶ ↷ ne skida fokus (mousedown). */
+const urEdit = { hk:false, f:false }, urSig = { hk:'', f:'' };
+function urState(k){
+  const h = k==='hk' ? hkHist : fh, p = k==='hk' ? !!hkTimer : !!fhTimer;
+  return { avail: !!h && (p || h.i > 0 || h.i < h.s.length-1), sig: h ? h.i+'/'+h.s.length+(p?'p':'') : '' };
+}
+function urSync(k){
+  const foot = document.querySelector((k==='hk' ? '#hkBackdrop' : '#formBackdrop')+' .cd-foot'); if(!foot) return;
+  const st = urState(k);
+  if(st.sig !== urSig[k]){ if(urSig[k] && st.sig && st.avail) urEdit[k] = true; urSig[k] = st.sig; }
+  foot.classList.toggle('urmode', urEdit[k] && st.avail);
+}
+function urEnd(k){ urEdit[k] = false; urSync(k); }
+function urKey(el){ return el && el.closest ? (el.closest('#hkBackdrop') ? 'hk' : el.closest('#formBackdrop') ? 'f' : '') : ''; }
+const urTxt = el=> el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !/^(button|checkbox|radio|file)$/.test(el.type)));
+document.addEventListener('focusin', (e)=>{ const k = urKey(e.target); if(k && urTxt(e.target)){ urEdit[k] = true; urSync(k); } });
+document.addEventListener('focusout', (e)=>{ const k = urKey(e.target); if(!k || !urTxt(e.target)) return;
+  const el = e.target;   /* polje nestalo zbog ponovnog crtanja (↶ ↷, AI) ≠ izlazak iz izmene */
+  setTimeout(()=>{ if(!el.isConnected) return; const a = document.activeElement; if(!(urTxt(a) && urKey(a) === k)) urEnd(k); }, 60); });
 /* v58 (Zoran 20.11.): AI čita gumu (i tablicu) sa slike dodate u hotel karticu i sam popunjava PRAZNA polja — kao tablica u terminu.
    Proba 20.11. (guma-proba.html): brži model tačno pročitao obe gume i sa loših slika iz daljine. Sezona samo po oznaci:
    3PMSF → zimske, bez zimskih oznaka i čitljivo → letnje; inače ne upisuje dimenziju (pogrešan okvir je gora greška od praznog).
@@ -4394,7 +4415,7 @@ function updateSaveDim(){
 let fh = null, fhTimer = null;
 function fhSnap(){ const o = {}; DRAFT_FIELDS.forEach(k=>{ o[k] = formDraft[k]==null ? '' : String(formDraft[k]); }); o.slike = (formDraft.slike||[]).slice(); o.vozilo = formDraft.vozilo || ''; return o; }
 function fhKey(o){ return JSON.stringify(DRAFT_FIELDS.map(k=>o[k]).concat([o.slike.map(p=>p.length+p.slice(-16)).join(',')])); }
-function fhReset(){ clearTimeout(fhTimer); fhTimer = null; fh = formDraft ? { s:[fhSnap()], i:0 } : null; }
+function fhReset(){ clearTimeout(fhTimer); fhTimer = null; fh = formDraft ? { s:[fhSnap()], i:0 } : null; urEdit.f = false; urSig.f = ''; }
 function fhSchedule(){ if(!fh) return; clearTimeout(fhTimer); fhTimer = setTimeout(fhPush, 800); fhBar(); }
 function fhPush(){
   clearTimeout(fhTimer); fhTimer = null;
@@ -4419,7 +4440,7 @@ function fhBar(){
   const pend = !!fhTimer;
   document.querySelectorAll('#formBackdrop .f-undo').forEach(u=>u.classList.toggle('dim', !fh || (fh.i <= 0 && !pend)));
   document.querySelectorAll('#formBackdrop .f-redo').forEach(r=>r.classList.toggle('dim', !fh || pend || fh.i >= fh.s.length-1));
-  const ur = document.getElementById('fUr'); if(ur) ur.classList.toggle('show', !!fh && (pend || fh.i > 0 || fh.i < fh.s.length-1));
+  urSync('f');
   const ns = document.getElementById('napSave'); if(ns) ns.classList.toggle('dim', !napDirty());
 }
 /* v36 Napomena kao beležnica (uzor Gde sam ostavio v3): dodir → preko celog ekrana (samo klasa — tekst i fokus se ne
@@ -4793,10 +4814,11 @@ function renderItemForm(){
       '<textarea id="fNapomena" '+TA+' onfocus="expandNap()" onclick="expandNap()" oninput="updateDraft(\'napomena\',this.value)">'+v('napomena')+'</textarea></div>'+
     '</div>'+
     '<div class="modal-actions ff-foot cd-foot">'+
-    '<div class="hk-urfloat" id="fUr">'+UR+'</div>'+   /* v58 (Zoran 20.11.): ↶ ↷ plutaju iznad donjeg reda kao u hotel kartici */
+    /* v59: dok menjaš, Slikaj/Galerija/Obriši se zamene širokim ↶ ↷ (kao u hotel kartici) */
+    '<span class="ft-std">'+
     '<button class="home-sq" onclick="openCamera()"><span class="sq-box">📷</span>Slikaj</button>'+
     '<button class="home-sq" onclick="pickGallery()"><span class="sq-box">🖼️</span>Galerija</button>'+
-    (orig ? '<button class="home-sq cd-delsq" onclick="deleteFromForm()"><span class="sq-box">🗑</span>Obriši</button>' : '')+
+    (orig ? '<button class="home-sq cd-delsq" onclick="deleteFromForm()"><span class="sq-box">🗑</span>Obriši</button>' : '')+'</span>'+'<span class="ft-ur" onmousedown="event.preventDefault()">'+UR+'</span>'+
     '<button class="home-sq" onclick="closeItemForm()"><span class="sq-box">✕</span>Otkaži</button>'+
     '<button class="home-sq cd-save" id="ffSave" onclick="saveItemForm()"><span class="sq-box">✓</span>Sačuvaj</button>'+
     '</div></div>';
@@ -4813,7 +4835,7 @@ function renderItemForm(){
   const cb = document.getElementById('cdBig');
   if(cb && n) makeStrip(cb.querySelector('.sw-strip'), { idx:cdIdx, zoom:false,
     onIdx:(i)=>{ cdIdx = i; const c = document.getElementById('cdCnt'); if(c) c.textContent = (i+1)+' / '+formDraft.slike.length; },
-    onTap:()=>openViewer(cdIdx) });
+    onTap:()=>{ urEnd('f'); openViewer(cdIdx); } });
 }
 /* v27 (Zoran 3.11.): red na vrhu obrasca uvek kad klijent ima bar jednu završenu zamenu — na zakazanom „Ranije: N“,
    na samom zapisu „Istorija: N“ (računa i njega); dodir = istorija klijenta */
