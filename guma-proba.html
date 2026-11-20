@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="sr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proba: AI čita gumu</title>
+<!-- Proba 20.11.2026: da li Gemini sa slike bočne strane gume pouzdano čita dimenziju, proizvođača, letnja/zimska (3PMSF, M+S) i DOT.
+     Nije deo aplikacije; ništa ne upisuje u Zakazivanje. Ključ uzima iz Zakazivanja (isti sajt), sam ga ne čuva. -->
+<style>
+  body{ margin:0; padding:16px; font:17px/1.4 system-ui,sans-serif; background:#EAE1C7; color:#2B2B24; }
+  h1{ font-size:21px; margin:4px 0 6px; }
+  p.uput{ font-size:14.5px; margin:0 0 12px; color:#5d5a4c; }
+  .red{ display:flex; gap:10px; margin:0 0 10px; }
+  button{ flex:1; padding:15px 8px; font:inherit; font-weight:700; border:none; border-radius:12px; background:#28402F; color:#fff; }
+  button.sec{ background:#FBF8EF; color:#2B2B24; border:1.5px solid #CDBF98; }
+  button.izb{ background:#FBF8EF; color:#2B2B24; border:1.5px solid #CDBF98; font-size:15px; }
+  button.izb.on{ background:#28402F; color:#fff; border-color:#28402F; }
+  #stanje{ background:#FBF8EF; border:1.5px solid #CDBF98; border-radius:12px; padding:10px 12px; margin:0 0 12px; font-size:15px; }
+  .kar{ background:#FBF8EF; border:1.5px solid #CDBF98; border-radius:14px; padding:10px; margin:0 0 14px; box-shadow:0 2px 7px rgba(43,43,36,.12); }
+  .kar img{ width:100%; max-height:240px; object-fit:contain; background:#222; border-radius:10px; display:block; }
+  .kar table{ width:100%; border-collapse:collapse; margin-top:8px; font-size:16px; }
+  .kar td{ padding:5px 4px; border-bottom:1px solid #E4DAC0; vertical-align:top; }
+  .kar td:first-child{ color:#6b6756; width:38%; font-size:14px; }
+  .kar td b{ font-size:18px; }
+  .sig{ font-size:12.5px; padding:1px 7px; border-radius:8px; margin-left:6px; white-space:nowrap; }
+  .sig.v{ background:#d7ecd9; color:#1d5a2a; } .sig.s{ background:#f6e7c2; color:#7a5a07; } .sig.n{ background:#f6d4cf; color:#8a2a1c; }
+  .mal{ font-size:13px; color:#6b6756; margin-top:6px; }
+  .ocena{ display:flex; gap:8px; margin-top:8px; }
+  .ocena button{ padding:10px 6px; font-size:15px; }
+  .ocena button.ok.on{ background:#2f7a3d; } .ocena button.bad.on{ background:#b33a2a; }
+  .ocena button:not(.on){ background:#FBF8EF; color:#2B2B24; border:1.5px solid #CDBF98; }
+  #zbir{ font-weight:700; margin:0 0 12px; }
+  #log{ font-size:13px; background:#FBF8EF; border:1px solid #CDBF98; border-radius:12px; padding:10px; white-space:pre-wrap; word-break:break-word; display:none; }
+  .err{ color:#b33a2a; font-weight:700; }
+</style>
+</head>
+<body>
+<h1>Proba: AI čita gumu</h1>
+<p class="uput">Slikaj bočnu stranu gume iz blizine, da se vide dimenzija i natpis proizvođača. Za svaku sliku označi ✓ ako je sve tačno ili ✗ ako je nešto pogrešno. Ništa se ne upisuje u aplikaciju.</p>
+<div id="stanje">Proveravam ključ…</div>
+<div class="red">
+  <button class="izb on" id="mJak" onclick="izaberi('gemini-3.6-flash')">Jači model</button>
+  <button class="izb" id="mBrz" onclick="izaberi('gemini-3.5-flash-lite')">Brži model</button>
+</div>
+<div class="red">
+  <button onclick="document.getElementById('kam').click()">📷 Slikaj</button>
+  <button class="sec" onclick="document.getElementById('gal').click()">🖼️ Galerija</button>
+</div>
+<input id="kam" type="file" accept="image/*" capture="environment" hidden onchange="uzmi(this)">
+<input id="gal" type="file" accept="image/*" multiple hidden onchange="uzmi(this)">
+<div id="zbir"></div>
+<div id="lista"></div>
+<div class="red"><button class="sec" onclick="kopiraj()">Kopiraj rezultate</button></div>
+<div id="log"></div>
+<script>
+const KEY = (()=>{ try{ return localStorage.getItem('zg:apiKey') || ''; }catch(e){ return ''; } })();
+let MODEL = 'gemini-3.6-flash';
+const REZ = [];   // { br, model, ms, r, ocena }
+const st = document.getElementById('stanje');
+st.innerHTML = KEY ? 'Ključ pronađen (iz Zakazivanja). Izaberi model i slikaj gumu.' : '<span class="err">Nema ključa.</span> Otvori Zakazivanje u ovom Chrome-u i proveri da je Gemini ključ upisan u Podešavanjima.';
+
+function izaberi(m){ MODEL = m; document.getElementById('mJak').classList.toggle('on', m==='gemini-3.6-flash'); document.getElementById('mBrz').classList.toggle('on', m!=='gemini-3.6-flash'); }
+
+const SYS = 'Na slici je bočna strana automobilske gume u vulkanizerskoj radnji u Srbiji. Pročitaj šta je utisnuto na gumi. '+
+  'Pravila: piši samo ono što stvarno vidiš na slici; ako nešto ne može jasno da se pročita, vrati prazan string i to navedi u polju nejasno. Ne pogađaj po izgledu gume. '+
+  'dimenzija: u obliku "205/55 R16" (širina/visina R prečnik); indeks: indeks nosivosti i brzine ako se vidi (npr. "91H"). '+
+  'proizvodjac i model: kako piše na gumi. '+
+  'oznaka_3pmsf: true samo ako se vidi simbol pahulje u planini sa tri vrha. oznaka_ms: true ako se vidi M+S, M/S ili M&S. '+
+  'sezona: "zimska" ako postoji 3PMSF ili je model poznata zimska guma; "celogodisnja" ako piše All Season / 4 Seasons ili slično; "letnja" ako nema zimskih oznaka a natpisi su jasno čitljivi; "nepoznato" ako se ne vidi dovoljno. '+
+  'sezona_osnov: kratko na osnovu čega (npr. "vidi se 3PMSF", "nema zimskih oznaka"). '+
+  'dot: poslednje 4 cifre DOT oznake (nedelja i godina, npr. "2321") samo ako se jasno vide. '+
+  'sigurnost: "visoka", "srednja" ili "niska" za ceo odgovor. nejasno: kratko šta nije moglo da se pročita.';
+const SCHEMA = { type:'object', properties:{
+  dimenzija:{type:'string'}, indeks:{type:'string'}, proizvodjac:{type:'string'}, model:{type:'string'},
+  oznaka_3pmsf:{type:'boolean'}, oznaka_ms:{type:'boolean'},
+  sezona:{type:'string', enum:['zimska','letnja','celogodisnja','nepoznato']}, sezona_osnov:{type:'string'},
+  dot:{type:'string'}, sigurnost:{type:'string', enum:['visoka','srednja','niska']}, nejasno:{type:'string'} },
+  required:['dimenzija','proizvodjac','sezona','sigurnost'] };
+
+function smanji(file, max, q){
+  return new Promise((res, rej)=>{
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = ()=>{ const k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas'); c.width = Math.round(img.width*k); c.height = Math.round(img.height*k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      res(c.toDataURL('image/jpeg', q)); };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); rej(new Error('Slika ne može da se otvori.')); };
+    img.src = url;
+  });
+}
+async function pitaj(dataUrl){
+  const parts = [{ inlineData:{ mimeType:'image/jpeg', data: dataUrl.split(',')[1] } }, { text:'Pročitaj gumu sa slike.' }];
+  const gcs = [ { responseMimeType:'application/json', responseJsonSchema: SCHEMA, maxOutputTokens: 600 },
+                { responseMimeType:'application/json', maxOutputTokens: 600 } ];
+  let last = '';
+  for(const gc of gcs){
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+MODEL+':generateContent',
+      { method:'POST', headers:{ 'Content-Type':'application/json', 'x-goog-api-key': KEY },
+        body: JSON.stringify({ systemInstruction:{ parts:[{ text: SYS }] }, contents:[{ role:'user', parts }], generationConfig: gc }) });
+    const txt = await r.text();
+    if(!r.ok){ last = r.status+' '+txt.slice(0,300); if(r.status===400 && !/API key/i.test(txt)) continue; throw new Error(last); }
+    const j = JSON.parse(txt), c = j.candidates && j.candidates[0];
+    const raw = c && c.content && c.content.parts && c.content.parts.map(p=>p.text||'').join('') || '';
+    return JSON.parse(raw.replace(/^```(json)?|```$/g,'').trim());
+  }
+  throw new Error(last || 'Gemini nije odgovorio.');
+}
+const esc = s=> String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function godina(dot){ const m = /^(\d{2})(\d{2})$/.exec(dot||''); return m ? ' (nedelja '+(+m[1])+', 20'+m[2]+'.)' : ''; }
+function karta(x){
+  const r = x.r || {};
+  const sig = r.sigurnost==='visoka' ? 'v' : r.sigurnost==='srednja' ? 's' : 'n';
+  const sez = {zimska:'❄️ zimska', letnja:'☀️ letnja', celogodisnja:'🌦️ celogodišnja', nepoznato:'❓ ne zna'}[r.sezona] || '—';
+  return '<img src="'+x.slika+'">'+
+    (x.greska ? '<div class="err" style="margin-top:8px">Greška: '+esc(x.greska)+'</div>' :
+    '<table>'+
+    '<tr><td>Dimenzija</td><td><b>'+esc(r.dimenzija||'—')+'</b> '+esc(r.indeks||'')+'</td></tr>'+
+    '<tr><td>Proizvođač</td><td><b>'+esc(r.proizvodjac||'—')+'</b> '+esc(r.model||'')+'</td></tr>'+
+    '<tr><td>Sezona</td><td><b>'+sez+'</b><div class="mal">'+esc(r.sezona_osnov||'')+' · 3PMSF: '+(r.oznaka_3pmsf?'da':'ne')+' · M+S: '+(r.oznaka_ms?'da':'ne')+'</div></td></tr>'+
+    '<tr><td>DOT</td><td>'+esc(r.dot||'—')+esc(godina(r.dot))+'</td></tr>'+
+    '<tr><td>Sigurnost</td><td><span class="sig '+sig+'">'+esc(r.sigurnost||'?')+'</span></td></tr>'+
+    (r.nejasno ? '<tr><td>Nejasno</td><td class="mal">'+esc(r.nejasno)+'</td></tr>' : '')+
+    '</table>')+
+    '<div class="mal">#'+x.br+' · '+x.model+' · '+(x.ms/1000).toFixed(1)+' s</div>'+
+    (x.greska ? '' : '<div class="ocena"><button class="ok'+(x.ocena==='ok'?' on':'')+'" onclick="oceni('+x.br+',\'ok\')">✓ Sve tačno</button><button class="bad'+(x.ocena==='bad'?' on':'')+'" onclick="oceni('+x.br+',\'bad\')">✗ Nešto pogrešno</button></div>');
+}
+function crtaj(x){ const el = document.getElementById('k'+x.br); if(el) el.innerHTML = karta(x); zbir(); }
+function oceni(br, o){ const x = REZ.find(z=>z.br===br); if(!x) return; x.ocena = o; crtaj(x); }
+function zbir(){
+  const oc = REZ.filter(x=>x.ocena), ok = oc.filter(x=>x.ocena==='ok').length;
+  document.getElementById('zbir').textContent = oc.length ? 'Ocenjeno '+oc.length+': tačno '+ok+', pogrešno '+(oc.length-ok) : '';
+}
+async function uzmi(inp){
+  const files = [...inp.files]; inp.value = '';
+  if(!KEY){ alertBox('Nema ključa.'); return; }
+  for(const f of files){
+    const x = { br: REZ.length+1, model: MODEL, ms: 0 };
+    REZ.push(x);
+    const div = document.createElement('div'); div.className = 'kar'; div.id = 'k'+x.br;
+    document.getElementById('lista').prepend(div);
+    try{
+      x.slika = await smanji(f, 1600, 0.88);
+      div.innerHTML = '<img src="'+x.slika+'"><div class="mal" style="margin-top:8px">Čitam… ('+MODEL+')</div>';
+      const t0 = performance.now();
+      x.r = await pitaj(x.slika);
+      x.ms = performance.now() - t0;
+    }catch(e){ x.greska = (e && e.message) || String(e); }
+    crtaj(x);
+  }
+}
+function alertBox(t){ st.innerHTML = '<span class="err">'+esc(t)+'</span>'; }
+function kopiraj(){
+  const t = REZ.map(x=> '#'+x.br+' '+x.model+' '+(x.ms/1000).toFixed(1)+'s ocena:'+(x.ocena||'-')+' '+(x.greska ? 'GREŠKA '+x.greska : JSON.stringify(x.r))).join('\n');
+  const lg = document.getElementById('log'); lg.style.display = 'block'; lg.textContent = t || 'Nema rezultata.';
+  try{ navigator.clipboard.writeText(t); st.textContent = 'Rezultati kopirani — nalepi ih ovde u razgovor.'; }catch(e){}
+}
+</script>
+</body>
+</html>
