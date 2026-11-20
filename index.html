@@ -1103,6 +1103,12 @@ body.noting .vw-screen, body.noting .cam-screen{ top:var(--note-h); }
 /* v56 (Zoran 20.11.): Slikaj i Galerija iz okvira slike u donji red hotel kartice — 6 dugmadi */
 .zf .cd-foot.hk-foot{ padding-left:4px; padding-right:4px; }
 .zf .cd-foot.hk-foot .home-sq{ flex:0 1 62px; }
+/* v57: adresa — van fokusa jedan red (kao ostala polja), u fokusu polje preko celog reda i tekst u više redova */
+.zf .hk-adr-row{ position:relative; }
+.zf .field.hk-adr textarea{ display:block; width:100%; border:none !important; background:transparent !important; box-shadow:none !important; padding:0; margin:0; height:24px; min-height:0; line-height:24px; font-family:inherit; font-size:16px; color:var(--text); resize:none; overflow:hidden; white-space:nowrap; outline:none; }
+.zf .field.hk-adr.open{ position:absolute; left:0; right:0; top:0; z-index:6; box-shadow:0 6px 18px rgba(43,43,36,.25); border-color:var(--green-deep) !important; }
+.zf .field.hk-adr.open textarea{ white-space:pre-wrap; word-break:break-word; }
+.zf .field.hk-adr textarea.pre-sel{ background:color-mix(in srgb, var(--green-deep) 20%, transparent) !important; }
 
 /* v45 (Zoran 18.11.): kvadrat sa brojem i bočna traka kao polje vremena na terminu (sporno ostaje crveno, na čekanju bledo) */
 .hl .hl-row, .hl .hl-row.ok{ border-left-color:var(--green-pale); }
@@ -2611,7 +2617,9 @@ function renderHotelCard(){
     '<div class="ff-head"><h2 class="serif">🏨 '+(h ? 'Hotel br. '+escapeHtml(h.mesto||'?') : 'Nov hotel klijent')+'</h2>'+UR+'<button class="modal-close-x" onclick="closeHotelCard()" aria-label="Zatvori">✕</button></div>'+
     '<div class="ff-body zf-body">'+hkPicsHtml()+
     '<div class="sec sec-pod">PODACI</div><div class="hk-data">'+   /* v53: podaci na tamnijoj traci kao finansije */
-    '<div class="zf-row">'+FB('ime','Ime i prezime')+FB('adresa','Adresa')+'</div>'+
+    '<div class="zf-row hk-adr-row">'+FB('ime','Ime i prezime')+
+      /* v57 (Zoran 20.11.): duga adresa — dodir proširi polje preko celog reda i prelomi tekst da se vidi cela */
+      '<div class="field hk-adr" data-k="adresa" onclick="zfFocus(event,this)"><label>Adresa</label><textarea id="hk_adresa" rows="1" '+F+' onfocus="hkAdrGrow(this,true)" onblur="hkAdrGrow(this,false)" oninput="this.value=this.value.replace(/[\\r\\n]+/g,\' \'); hkSet(\'adresa\', this.value); hkAdrGrow(this,true)">'+escapeHtml(d.adresa||'')+'</textarea></div></div>'+
     '<div class="zf-row">'+FB('telefon','Telefon','','tel',' inputmode="tel"')+FB('mesto','Mesto (broj)','','text',' inputmode="numeric"')+'</div>'+
     '<div class="zf-row">'+FB('auto','Auto')+FB('tablica','Registracija')+'</div>'+
     '<div class="hk-sez l"><div class="hk-sez-t">☀️ Letnje</div><div class="zf-row">'+FB('dimL','Dimenzija','','text',DIMX('dimL'))+FB('letnje','Brend')+fel('felnaL')+'</div></div>'+
@@ -4354,6 +4362,13 @@ function expandNap(){
 }
 function collapseNap(){ if(napCloseFn) closeOverlay(napCloseFn); }
 /* dodir bilo gde na polju (natpis je u polju) = u polje */
+/* v57: adresa u hotel kartici — u fokusu preko celog reda, visina po tekstu; van fokusa jedan red */
+function hkAdrGrow(el, on){
+  const f = el.closest('.field'); if(!f) return;
+  f.classList.toggle('open', on);
+  el.style.height = 'auto';
+  if(on) el.style.height = el.scrollHeight + 'px'; else { el.style.height = ''; el.scrollTop = 0; }
+}
 function zfFocus(e, box){
   if(e.target.closest('input,textarea,button,a')) return;
   const el = box.querySelector('input,textarea,button.tp-field'); if(!el) return;
