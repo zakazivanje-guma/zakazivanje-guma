@@ -1110,11 +1110,11 @@ body.noting .vw-screen, body.noting .cam-screen{ top:var(--note-h); }
 .zf .field.hk-adr.open textarea{ white-space:pre-wrap; word-break:break-word; }
 .zf .field.hk-adr textarea.pre-sel{ background:color-mix(in srgb, var(--green-deep) 20%, transparent) !important; }
 /* v58 (Zoran 20.11.): ↶ ↷ u redu PODACI; u zaglavlju 🤖 AI prekidač; godina gume (DOT) u zaglavlju okvira sezone; polja koja je AI upisao — zeleni okvir */
-.zf .cd-foot.hk-foot{ position:relative; }
-.hk-urfloat{ position:absolute; right:12px; top:-66px; display:flex; gap:8px; padding:6px; border-radius:16px; background:color-mix(in srgb, var(--pearl) 70%, transparent); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); box-shadow:0 4px 14px rgba(43,43,36,.22); opacity:0; transform:translateY(8px); pointer-events:none; transition:opacity .2s, transform .2s; z-index:8; }
+.zf .cd-foot.hk-foot, .zf .cd-foot{ position:relative; }
+.hk-urfloat{ position:absolute; right:12px; top:-74px; display:flex; gap:8px; padding:6px; border-radius:16px; background:color-mix(in srgb, var(--pearl) 70%, transparent); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); box-shadow:0 4px 14px rgba(43,43,36,.22); opacity:0; transform:translateY(8px); pointer-events:none; transition:opacity .2s, transform .2s; z-index:8; }
 .hk-urfloat.show{ opacity:1; transform:none; pointer-events:auto; }
-.hk-urfloat .cd-undo{ width:48px; height:42px; }
-.hk .zf-body{ padding-bottom:72px; }   /* poslednje dugme (+ Dodaj red) može da se skroluje iznad ↶ ↷ */
+.hk-urfloat .cd-undo{ width:84px; height:52px; font-size:30px; }   /* široko — da se ne promaši */
+.hk .zf-body, #formBackdrop .zf-body{ padding-bottom:80px; }   /* poslednje dugme (+ Dodaj red) može da se skroluje iznad ↶ ↷ */
 .hk-ai{ display:flex; align-items:center; gap:5px; height:46px; padding:0 13px; margin-left:auto; margin-right:10px; border-radius:13px; font:inherit; font-size:15px; font-weight:800; border:1.5px solid var(--green-deep); background:var(--green-deep); color:var(--on-accent); box-shadow:0 2px 6px rgba(40,64,47,.3); }
 .hk-ai:not(.on){ background:transparent; border:1.5px dashed var(--line); color:var(--text-dim); box-shadow:none; }
 .hk-ai.busy{ animation:hkAiPuls 1s ease-in-out infinite; }
@@ -4415,6 +4415,7 @@ function fhBar(){
   const pend = !!fhTimer;
   document.querySelectorAll('#formBackdrop .f-undo').forEach(u=>u.classList.toggle('dim', !fh || (fh.i <= 0 && !pend)));
   document.querySelectorAll('#formBackdrop .f-redo').forEach(r=>r.classList.toggle('dim', !fh || pend || fh.i >= fh.s.length-1));
+  const ur = document.getElementById('fUr'); if(ur) ur.classList.toggle('show', !!fh && (pend || fh.i > 0 || fh.i < fh.s.length-1));
   const ns = document.getElementById('napSave'); if(ns) ns.classList.toggle('dim', !napDirty());
 }
 /* v36 Napomena kao beležnica (uzor Gde sam ostavio v3): dodir → preko celog ekrana (samo klasa — tekst i fokus se ne
@@ -4757,7 +4758,7 @@ function renderItemForm(){
   const UR = '<button type="button" class="cd-undo f-undo" onclick="formUndo(-1)" aria-label="Poništi">↶</button><button type="button" class="cd-undo f-redo" onclick="formUndo(1)" aria-label="Ponovi">↷</button>';
   b.innerHTML = '<div class="modal form-full zf'+(isRec?' is-rec':'')+(napFull?' nap-full':'')+(hs?' zf-hs':'')+'">'+
     '<div class="ff-head">'+(fromHist ? '<button class="ff-backbtn" onclick="closeItemForm()" aria-label="Nazad na termin">'+HOME_IC.back+'</button>' : '')+
-    '<h2 class="serif">'+escapeHtml(orig ? (orig.ime||'Bez imena') : 'Novi termin')+'</h2>'+UR+
+    '<h2 class="serif">'+escapeHtml(orig ? (orig.ime||'Bez imena') : 'Novi termin')+'</h2>'+
     (fromHist ? '' : '<button class="modal-close-x" onclick="closeItemForm()" aria-label="Zatvori">✕</button>')+'</div>'+
     (isRec ? '<div class="rec-band"><span class="rb-ic">✓</span>'+(fromHist ? 'Iz istorije · zamena ' : 'Završena zamena · ')+escapeHtml(dmyShort(orig.datum))+'</div>' : '')+
     '<div class="ff-body zf-body">'+
@@ -4788,6 +4789,7 @@ function renderItemForm(){
       '<textarea id="fNapomena" '+TA+' onfocus="expandNap()" onclick="expandNap()" oninput="updateDraft(\'napomena\',this.value)">'+v('napomena')+'</textarea></div>'+
     '</div>'+
     '<div class="modal-actions ff-foot cd-foot">'+
+    '<div class="hk-urfloat" id="fUr">'+UR+'</div>'+   /* v58 (Zoran 20.11.): ↶ ↷ plutaju iznad donjeg reda kao u hotel kartici */
     '<button class="home-sq" onclick="openCamera()"><span class="sq-box">📷</span>Slikaj</button>'+
     '<button class="home-sq" onclick="pickGallery()"><span class="sq-box">🖼️</span>Galerija</button>'+
     (orig ? '<button class="home-sq cd-delsq" onclick="deleteFromForm()"><span class="sq-box">🗑</span>Obriši</button>' : '')+
