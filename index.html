@@ -1012,6 +1012,26 @@ input:where(:not([type=checkbox],[type=radio],[type=file])):focus, textarea:focu
 .zf.hk.nap-full .zf-body > :not(.zf-nap){ display:none !important; }
 .zf.hk.nap-full .hk-nap{ flex:1 1 auto !important; }
 .hl .hl-top{ flex:0 0 auto; padding:10px 14px 0; }
+/* v67 (Zoran 21.11.): Privremena kasa — 6 kvadrata u redu, ekran u temi početnog */
+.home-sq-row.row6{ justify-content:space-between; gap:0; } .home-sq-row.row6 .home-sq{ flex:1 1 0; min-width:0; max-width:62px; }
+.modal.ks{ background:var(--bg) !important; } .ks .ff-foot{ background:var(--bg) !important; justify-content:flex-end !important; padding-right:22px !important; }
+.ks .ks-top{ flex:0 0 auto; padding:12px 14px 0; }
+.ks-sum{ background:var(--green-deep); color:var(--on-accent); border-radius:18px; padding:14px 16px; display:flex; align-items:baseline; justify-content:space-between; }
+.ks-sum small{ font-size:13px; font-weight:700; opacity:.85; letter-spacing:.05em; } .ks-sum b{ font-size:34px; font-weight:800; letter-spacing:-.5px; }
+.ks-sub{ font-size:13.5px; color:var(--text-dim); margin:6px 4px 10px; min-height:18px; }
+.ks-in{ display:flex; gap:8px; margin-bottom:6px; }
+.ks-in input{ min-width:0; border:1px solid var(--line); border-radius:12px; padding:12px; font-size:18px; background:var(--pearl,var(--bg-card)); color:var(--text); font-family:inherit; box-sizing:border-box; }
+.ks-in .a{ width:110px; flex:none; font-weight:800; } .ks-in .o{ flex:1; font-size:16px; }
+.ks-in input:focus{ outline:2px solid var(--green-deep); outline-offset:-1px; }
+.ks-in button{ flex:none; width:54px; border-radius:12px; border:none; background:var(--green-deep); color:var(--on-accent); font-size:24px; font-family:inherit; cursor:pointer; }
+.ks .ks-body{ display:block; overflow:auto; padding:6px 14px; }
+.ks-list{ position:relative; }
+.ks-row{ position:relative; z-index:1; touch-action:pan-y; display:flex; align-items:center; gap:12px; width:100%; text-align:left; font-family:inherit; background:var(--bg-card); border:1px solid var(--line); border-radius:14px; padding:10px 14px; margin:0 0 8px; cursor:pointer; box-sizing:border-box; }
+.ks-row.ed{ outline:2px solid var(--green-deep); outline-offset:-1px; }
+.ks-row .v{ font-size:13px; color:var(--text-dim); flex:none; min-width:40px; } .ks-row .o{ flex:1; min-width:0; font-size:15px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ks-row .i{ font-size:18px; font-weight:800; color:var(--text); flex:none; }
+.ks-hint{ font-size:13px; color:var(--text-dim); margin:8px 4px; line-height:1.45; }
+.ks .cd-save.dim{ opacity:.4; }
 .hl .hl-body{ display:block; overflow:auto; padding:10px 14px; }
 #hlBackdrop .hl-body{ padding-top:0; }
 .hl .hl-list > .hs-sec:first-child{ margin-top:4px; }
@@ -1499,7 +1519,7 @@ function persistChecked(key, val){ if(!lsSet(key, val)){ warnSaveFailed(); retur
 function buildBackup(){
   /* v36: slike vozila (IndexedDB) idu u kopiju posebno, jednom po vozilu */
   const vozila = [...SLIKE.keys()].map(id=>{ const o = VOPIS.get(id) || {}; return { id: id, slike: SLIKE.get(id).slice(), opis: o.opis || '', sig: o.sig || '' }; });
-  return { app:'zakazivanje-guma', version:1, exportedAt: new Date().toISOString(), items: items, vozila: vozila, hotel: hotel, slikeNazivi: PNAZ, settings: settings, backupIntervalDays: getBackupIntervalDays() };
+  return { app:'zakazivanje-guma', version:1, exportedAt: new Date().toISOString(), items: items, vozila: vozila, hotel: hotel, kasa: kasa, slikeNazivi: PNAZ, settings: settings, backupIntervalDays: getBackupIntervalDays() };
 }
 
 /* v54 (uzor Troškovi v34/v37): „Podeli kopiju“ — Androidov meni za deljenje (Google Drive, mejl…). Chrome ne deli .json
@@ -1675,6 +1695,7 @@ function handleImportFile(fileInput){
 function applyBackup(backup){
   items = backup.items || [];
   persistItems();
+  if(Array.isArray(backup.kasa)){ kasa = backup.kasa; persistKasa(); }   /* v67 */
   if(Array.isArray(backup.hotel)){ hotel = backup.hotel; hotel.forEach(hotelMigr); persistHotel(); localStorage.setItem('zg:hotelUvoz1', localStorage.getItem('zg:hotelUvoz1') || new Date().toISOString()); }   /* v40; starija kopija bez hotela ga ne briše */
   /* v36: slike vozila iz kopije idu u IndexedDB; vozila kojih nema u kopiji (a nisu u korpi) se brišu */
   const voz = Array.isArray(backup.vozila) ? backup.vozila.filter(x=>x && x.id && Array.isArray(x.slike) && x.slike.length) : [];
@@ -3554,12 +3575,13 @@ function render(){
   const sqRow = selMode
     ? '<div class="sel-bar"><button class="sel-x" onclick="exitSelect()" aria-label="Prekini označavanje">✕</button><span class="sel-n">Označeno: '+nSel+'</span>'+
       '<button class="sel-all" onclick="selAll()">'+(nSel && nSel===allDone ? 'Poništi sve' : 'Označi sve')+'</button></div>'
-    : '<div class="home-sq-row">'+
+    : '<div class="home-sq-row'+(pastOnly ? '' : ' row6')+'">'+
       (pastOnly ? '' : '<button class="home-sq sq-main" onclick="openNewForm()"><span class="sq-box">'+HOME_IC.plus+'</span>Dodaj</button>')+
       '<button class="home-sq" onclick="toggleSearch()"><span class="sq-box">'+HOME_IC.search+'</span>Pretraži</button>'+
       '<button class="home-sq'+(pastOnly && pastKind==='done'?' sq-on':'')+'" onclick="togglePastOnly(\'done\')"><span class="sq-box">'+HOME_IC.done+'</span>Završeno</button>'+
       '<button class="home-sq'+(pastOnly && pastKind==='otk'?' sq-on':'')+'" onclick="togglePastOnly(\'otk\')"><span class="sq-box">'+HOME_IC.otk+'</span>Otkazano</button>'+
       '<button class="home-sq sq-hotel" onclick="openHotelList()"><span class="sq-box">🏨</span>Hotel</button>'+   /* v40; Sortiraj je ⇅ gore */
+      '<button class="home-sq sq-kasa" onclick="openKasa()"><span class="sq-box">'+KASA_IC+'</span>Kasa</button>'+   /* v67 (Zoran 21.11.) */
       '</div>';
   const bottom = selMode
     ? '<div class="bottom-bar sel-actions'+(pastKind==='done'?' sel3':'')+'">'+(pastKind==='done' ? '<button class="sel-new'+(nSel===1?'':' dim')+'" onclick="selNew()">＋ Novi termin</button>' : '')+'<button class="sel-back'+(nSel?'':' dim')+'" onclick="selRestore()">↶ Vrati u zakazane</button><button class="sel-del'+(nSel?'':' dim')+'" onclick="selDelete()">Obriši</button></div>'
@@ -3806,7 +3828,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 66; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 67; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -5273,6 +5295,99 @@ function openSettingsSub(key){
   settingsSubFn = ()=>{ settingsSubFn=null; renderSettingsTiles(); };
   pushOverlay(settingsSubFn);
 }
+/* ---------- v67 (Zoran 21.11.) PRIVREMENA KASA: naplaćeno se upisuje dok se novac ne preda u pravu kasu. Nije povezano sa
+   terminima ni hotelom (Zoranova odluka). zg:kasa [{id, vreme ISO, iznos broj, opis}]; ide u bekap. „Predato“ prazni spisak
+   i ceo spisak ide u korpu ({kasa:{redovi, predato:true}}); obrisan red isto ide u korpu ({kasa:{redovi:[red]}}). ---------- */
+const KASA_IC = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="9" rx="2"/><path d="M6 11V5h8v6"/><path d="M8 8h4"/><path d="M7 15h2M11 15h2M15 15h2"/></svg>';
+let kasa = [], kasaCloseFn = null, kasaEd = null;
+function loadKasa(){ try{ const v = JSON.parse(localStorage.getItem('zg:kasa')||'[]'); kasa = Array.isArray(v) ? v : []; }catch(e){ kasa = []; } }
+function persistKasa(){ return persistChecked('zg:kasa', JSON.stringify(kasa)); }
+function kasaSum(l){ return (l||kasa).reduce((a,r)=>a+(Number(r.iznos)||0), 0); }
+function kasaNum(n){ return String(Math.round(Number(n)||0)).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+function naplataRec(n){ const a = n%10, b = n%100; return a===1 && b!==11 ? 'naplata' : 'naplate'; }
+function kasaVreme(iso){ const d = new Date(iso); if(isNaN(d)) return ''; const p = n=>String(n).padStart(2,'0'), hm = p(d.getHours())+':'+p(d.getMinutes());
+  const t = new Date(); return d.toDateString()===t.toDateString() ? hm : d.getDate()+'.'+(d.getMonth()+1)+'. '+hm; }
+function openKasa(){
+  if(document.getElementById('ksBackdrop')) return;
+  kasaEd = null;
+  const b = document.createElement('div'); b.className='modal-backdrop'; b.id='ksBackdrop';
+  const F = 'autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"';
+  b.innerHTML = '<div class="modal form-full zf ks"><div class="ff-head"><h2 class="serif">Privremena kasa</h2>'+
+    '<button class="modal-close-x" onclick="closeKasa()" aria-label="Zatvori">✕</button></div>'+
+    '<div class="ks-top"><div class="ks-sum"><small>UKUPNO</small><b id="ksSum">0</b></div><div class="ks-sub" id="ksSub"></div>'+
+    '<div class="ks-in"><input class="a" id="ksA" inputmode="numeric" enterkeyhint="done" placeholder="Iznos" '+F+'>'+
+    '<input class="o" id="ksO" enterkeyhint="done" placeholder="Za šta (ne mora)" '+F+'>'+
+    '<button type="button" id="ksAdd" onmousedown="event.preventDefault()" onclick="kasaAdd()" aria-label="Dodaj">+</button></div></div>'+
+    '<div class="ff-body ks-body"><div class="ks-list" id="ksList"></div><div class="ks-hint" id="ksHint"></div></div>'+
+    '<div class="ff-foot cd-foot"><button class="home-sq cd-save" id="ksDone" onclick="kasaPredato()"><span class="sq-box">✓</span>Predato</button></div></div>';
+  document.body.appendChild(b);
+  const a = document.getElementById('ksA'), o = document.getElementById('ksO');
+  [a, o].forEach(el=> el.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); kasaAdd(); } }));
+  if(typeof wireBackspace==='function'){ wireBackspace(a, null); wireBackspace(o, a); }
+  renderKasa();
+  kasaCloseFn = ()=>{ const x = document.getElementById('ksBackdrop'); if(x) x.remove(); kasaCloseFn = null; kasaEd = null; };
+  pushOverlay(kasaCloseFn);
+}
+function closeKasa(){ if(kasaCloseFn) closeOverlay(kasaCloseFn); }
+function renderKasa(){
+  if(!document.getElementById('ksBackdrop')) return;
+  const L = kasa.slice().sort((x,y)=> String(y.vreme).localeCompare(String(x.vreme)));
+  document.getElementById('ksSum').textContent = kasaNum(kasaSum());
+  const first = L.length ? L[L.length-1] : null;
+  document.getElementById('ksSub').textContent = L.length ? L.length+' '+naplataRec(L.length)+' · od '+kasaVreme(first.vreme) : 'Nema upisanih naplata.';
+  document.getElementById('ksList').innerHTML = L.map(r=>'<button type="button" class="ks-row'+(kasaEd===r.id?' ed':'')+'" data-id="'+escapeHtml(r.id)+'" onclick="kasaEdit(this.dataset.id)">'+
+    '<span class="v">'+escapeHtml(kasaVreme(r.vreme))+'</span><span class="o">'+escapeHtml(r.opis||'')+'</span><span class="i">'+kasaNum(r.iznos)+'</span></button>').join('');
+  document.getElementById('ksHint').innerHTML = L.length ? 'Dodir na red = izmena · prevuci ulevo = obriši.<br>Kad predaš novac u pravu kasu: <b>Predato</b> — spisak se prazni (ide u korpu).'
+    : 'Upiši iznos (i za šta, ako hoćeš), pa <b>+</b> ili Enter.';
+  document.getElementById('ksAdd').textContent = kasaEd ? '✓' : '+';
+  document.getElementById('ksDone').classList.toggle('dim', !L.length);
+  document.querySelectorAll('#ksList .ks-row').forEach(t=> swipeToDelete(t, null, false, false, ()=>kasaDel(t.dataset.id)));
+}
+function kasaAdd(){
+  const a = document.getElementById('ksA'), o = document.getElementById('ksO'); if(!a) return;
+  kasaDisarm();   /* osenčen stari tekst (gboard-backspace) se vraća u polje pre čitanja */
+  const n = normIznos(a.value), opis = o.value.trim();
+  if(!n){ showNote('Upiši iznos.', {warn:true}); a.focus(); return; }
+  const pre = kasa.map(r=>Object.assign({}, r));
+  if(kasaEd){ const r = kasa.find(x=>x.id===kasaEd); if(r){ r.iznos = n; r.opis = opis; } }
+  else kasa.push({ id: uid('k'), vreme: new Date().toISOString(), iznos: n, opis: opis });
+  if(!persistKasa()){ kasa = pre; return; }
+  const bio = kasaEd; kasaEd = null;
+  a.value = ''; o.value = ''; renderKasa(); a.focus();
+  showNote(bio ? 'Izmenjeno: '+kasaNum(n)+' din' : 'Upisano: '+kasaNum(n)+' din');
+}
+function kasaEdit(id){
+  const r = kasa.find(x=>x.id===id); if(!r) return;
+  const a = document.getElementById('ksA'), o = document.getElementById('ksO');
+  kasaDisarm(true);
+  if(kasaEd===id){ kasaEd = null; a.value = ''; o.value = ''; renderKasa(); return; }   /* drugi dodir na isti red = odustani */
+  kasaEd = id; a.value = String(r.iznos); o.value = r.opis || ''; renderKasa(); a.focus();
+}
+function kasaDisarm(clear){ ['ksA','ksO'].forEach(k=>{ const el = document.getElementById(k); if(el && typeof disarmField==='function'){ disarmField(el, !clear); } }); }
+function kasaToTrash(redovi, predato){
+  const list = getTrash();
+  list.push({ id: uid('kt'), deletedAt: Date.now(), kasa: { redovi: JSON.parse(JSON.stringify(redovi)), predato: !!predato } });
+  return setTrash(list);
+}
+function kasaDel(id){
+  const r = kasa.find(x=>x.id===id); if(!r) return;
+  if(!kasaToTrash([r], false)){ showBanner('Brisanje nije uspelo: na telefonu nema mesta za korpu. Isprazni korpu u Podešavanjima pa probaj ponovo.'); return; }
+  kasa = kasa.filter(x=>x!==r);
+  if(!persistKasa()){ kasa.push(r); return; }
+  if(kasaEd===id){ kasaEd = null; kasaDisarm(true); const a = document.getElementById('ksA'), o = document.getElementById('ksO'); if(a){ a.value=''; o.value=''; } }
+  renderKasa(); showNote('Obrisano '+kasaNum(r.iznos)+' din (u korpi).');
+}
+function kasaPredato(){
+  if(!kasa.length) return;
+  const uk = kasaSum(), n = kasa.length;
+  showConfirm('Predato u kasu? Ukupno '+kasaNum(uk)+' din ('+n+' '+naplataRec(n)+'). Spisak se prazni, a ova predaja ide u korpu — može se vratiti.', ()=>{
+    if(!kasaToTrash(kasa, true)){ showBanner('Nije uspelo: na telefonu nema mesta za korpu. Isprazni korpu u Podešavanjima pa probaj ponovo.'); return; }
+    const pre = kasa; kasa = [];
+    if(!persistKasa()){ kasa = pre; return; }
+    kasaEd = null; kasaDisarm(true); const a = document.getElementById('ksA'), o = document.getElementById('ksO'); if(a){ a.value=''; o.value=''; }
+    renderKasa(); showNote('Predato u kasu: '+kasaNum(uk)+' din');
+  }, 'Predato');
+}
 /* ---------- KORPA (v48, po uzoru na Troškove v11; Zoranova odluka 14.10.: svaka aplikacija ima korpu) ----------
    Obrisana stavka (cela, sa slikom) čeka u korpi zadati broj dana (podrazumevano 30), zatim se trajno briše pri
    otvaranju aplikacije i korpe. Korpa NE ide u bekap. Ključevi: zg:trash, zg:trashDays. */
@@ -5296,8 +5411,8 @@ function trashPurgeExpired(){
   const list = getTrash(); const keep = list.filter(x=>trashDaysLeft(x) > 0);
   if(keep.length !== list.length) setTrash(keep);
 }
-function trashTileSub(){ const l = getTrash(), nh = l.filter(x=>x.hotel).length, nt = l.length - nh;
-  return l.length ? [nt ? nt+' '+terminRec(nt) : '', nh ? nh+' hotel '+(nh===1?'kartica':'kartice') : ''].filter(Boolean).join(' + ')+' u korpi' : 'Prazna'; }
+function trashTileSub(){ const l = getTrash(), nh = l.filter(x=>x.hotel).length, nk = l.filter(x=>x.kasa).length, nt = l.length - nh - nk;
+  return l.length ? [nt ? nt+' '+terminRec(nt) : '', nh ? nh+' hotel '+(nh===1?'kartica':'kartice') : '', nk ? nk+' iz kase' : ''].filter(Boolean).join(' + ')+' u korpi' : 'Prazna'; }
 function openTrashScreen(){
   if(!settingsCloseFn || settingsSubFn) return;
   trashPurgeExpired();
@@ -5305,7 +5420,7 @@ function openTrashScreen(){
   const NUM = 'inputmode="numeric" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"';
   setSettingsView('Korpa',
     '<div class="field"><label>Čuvaj obrisano (dana)</label>'+daysFieldHtml('trashDaysInput', getTrashDays())+'</div>'+
-    '<div class="field-hint" style="margin-bottom:14px;">Obrisani termini i uklonjene hotel kartice čekaju ovde toliko dana, pa se sami trajno brišu.</div>'+
+    '<div class="field-hint" style="margin-bottom:14px;">Obrisani termini, uklonjene hotel kartice i iznosi iz Privremene kase čekaju ovde toliko dana, pa se sami trajno brišu.</div>'+
     '<div id="trashList"></div>');
   wireBackspace(document.getElementById('trashDaysInput'), null);
   wireDaysField('trashDaysInput', getTrashDays,
@@ -5337,6 +5452,11 @@ function renderTrashList(){
       const left = trashDaysLeft(x), it = x.item || {}, hh = x.hotel;
       const leftTx = left <= 1 ? 'briše se danas' : 'još '+left+' '+daniRec(left);
       const sel = trashSel.has(x.id);
+      if(x.kasa){ const kr = x.kasa.redovi||[], ku = kasaSum(kr);
+        return '<div class="trash-item'+(sel?' sel':'')+'" data-id="'+escapeHtml(x.id)+'" onclick="trashToggle(this.dataset.id)">'+
+        '<span class="trash-check">'+(sel?'✓':'')+'</span>'+
+        '<div class="trash-tx"><div class="trash-name">'+escapeHtml('💵 Kasa: '+kasaNum(ku)+' din'+(x.kasa.predato ? ' ('+kr.length+' '+naplataRec(kr.length)+')' : (kr[0]&&kr[0].opis ? ' · '+kr[0].opis : '')))+'</div>'+
+        '<div class="trash-sub">'+escapeHtml((x.kasa.predato ? 'predato u kasu' : 'obrisano iz kase')+' · '+leftTx)+'</div></div></div>'; }
       if(hh) return '<div class="trash-item'+(sel?' sel':'')+'" data-id="'+escapeHtml(x.id)+'" onclick="trashToggle(this.dataset.id)">'+
         '<span class="trash-check">'+(sel?'✓':'')+'</span>'+
         '<div class="trash-tx"><div class="trash-name">🏨 '+escapeHtml((hh.mesto ? 'br. '+hh.mesto+' ' : '')+(hh.ime||'(bez imena)'))+'</div>'+
@@ -5355,7 +5475,10 @@ function trashToggleAll(){ const list = getTrash(); trashSel = trashSel.size===l
 function trashRestoreSelected(){
   const all = getTrash(), chosen = all.filter(x=>trashSel.has(x.id));
   if(!chosen.length) return;
-  const ct = chosen.filter(x=>x.item), ch = chosen.filter(x=>x.hotel), zauzeto = [];
+  const ct = chosen.filter(x=>x.item), ch = chosen.filter(x=>x.hotel), ck = chosen.filter(x=>x.kasa), zauzeto = [];
+  if(ck.length){ const pre = kasa.slice();   /* v67: vraćeno iz kase ide nazad u Privremenu kasu */
+    ck.forEach(x=> (x.kasa.redovi||[]).forEach(r=>{ const c = Object.assign({}, r); if(kasa.some(y=>y.id===c.id)) c.id = uid('k'); kasa.push(c); }));
+    if(!persistKasa()){ kasa = pre; return; } renderKasa(); }
   ct.forEach(x=>{
     const it = JSON.parse(JSON.stringify(x.item));
     if(items.some(i=>i.id===it.id)) it.id = uid('t');
@@ -5373,8 +5496,8 @@ function trashRestoreSelected(){
   setTrash(all.filter(x=>!trashSel.has(x.id)));
   trashSel = new Set();
   render(); renderTrashList();
-  const msg = chosen.length===1 ? (ch.length ? 'Hotel kartica „'+(ch[0].hotel.ime||'')+'“ je vraćena.' : 'Termin „'+(chosen[0].item.ime||'')+'“ je vraćen.')
-    : 'Vraćeno: '+[ct.length ? ct.length+' '+terminRec(ct.length) : '', ch.length ? ch.length+' hotel '+(ch.length===1?'kartica':'kartice') : ''].filter(Boolean).join(' + ')+'.';
+  const msg = chosen.length===1 && ck.length ? 'Vraćeno u Privremenu kasu.' : chosen.length===1 ? (ch.length ? 'Hotel kartica „'+(ch[0].hotel.ime||'')+'“ je vraćena.' : 'Termin „'+(chosen[0].item.ime||'')+'“ je vraćen.')
+    : 'Vraćeno: '+[ct.length ? ct.length+' '+terminRec(ct.length) : '', ch.length ? ch.length+' hotel '+(ch.length===1?'kartica':'kartice') : '', ck.length ? ck.length+' iz kase' : ''].filter(Boolean).join(' + ')+'.';
   showBanner(msg + (zauzeto.length ? ' Pažnja: mesto '+zauzeto.join(', ')+' već ima drugog klijenta — promeni broj u kartici.' : ''), zauzeto.length ? undefined : 'info');
 }
 function trashPurgeSelected(){
@@ -5422,6 +5545,7 @@ function openHelpScreen(){
     { t:'Zauzeti sati', c:'U panelu „U koliko sati?“ sat u kome tog dana već ima zakazan termin je obojen i ima mali broj termina u uglu. Kad izabereš sat, ispod minuta piše ime klijenta koji je u to vreme, a ispod je spisak svih termina tog sata. Zauzeto može i dalje da se izabere (dva auta u isto vreme).' },
     { t:'Telefon i SMS', c:'Na kartici je broj napisan čitljivo (063 880 8260). U terminu: kad je polje prazno, 📞 otvara Telefon na spisku poziva (kopiraš broj, 📋 ga nalepi); kad je broj upisan, 📞 zove klijenta, a 💬 otvara Poruke sa gotovim podsetnikom („Poštovani, podsećamo Vas na termin za zamenu guma sutra u 12:00. Tire Time“) — samo dodirneš Pošalji. Kad broja nema, 📞 otvara Telefon (da prepišeš broj iz poziva), a 📋 nalepi kopirani broj.' },
     { t:'Hotel za gume', c:'Kvadrat 🏨 Hotel otvara spisak klijenata čije gume čuvaš, po grupama (svaka grupa na svojoj tamnijoj traci; kvadrati i traka sezone gore stoje, pomera se samo spisak): ⚠ Sporno (crveno, npr. nije došao na zamenu), Čekaju zamenu (broj u boji polja vremena) i ✓ Zamenjeno ove sezone (zeleno). Gore su kvadrati kao na početnom ekranu: Novi (nov hotel klijent), Pretraži (otvara polje za pretragu) i Završeno (klijenti čije gume više ne čuvamo, po mesecima; ponovni dodir ili korak nazad vraća spisak) i Excel (ceo hotel u Excel fajl u Preuzimanjima, uređen kao aplikacija: list Hotel po grupama Sporno / Čekaju zamenu / Zamenjeno / Završeno, list Finansije po klijentu sa sezonama u boji i zbirom; fajl deliš iz programa kojim ga otvaraš — Pošalji kao datoteku — ili iz Preuzimanja). Prevuci klijenta udesno → Završeno: ide u Završeno, a njegovo mesto je slobodno. U Završenom prevuci udesno → Vrati u hotel (ako je mesto u međuvremenu zauzeto, otvori se kartica da upišeš novo). Ispod kvadrata piše sezona (zimska 1.10.–kraj februara, letnja 1.3.–30.9.) i koliko je zamenjeno. Broj u kvadratu je mesto gde su gume. Pretraga po imenu, registraciji, dimenziji, brendu, adresi ili broju. Dodavanje: kvadrat Novi → izaberi klijenta iz termina (ili prazna kartica); ili u otvorenom terminu dugme „🏨 U hotel“ na slici; ili dugi pritisak na termin → 🏨 U hotel za gume. Uklanjanje: prevuci klijenta u spisku ulevo → Izbriši (pita pre brisanja) — kartica ide u korpu (Podešavanja → Korpa), odakle se vraća dugmetom Vrati, sa svim podacima i starim redovima.' },
+    { t:'Privremena kasa', c:'Kvadrat Kasa na početnom ekranu otvara Privremenu kasu — beležnicu naplaćenog dok novac ne odneseš u pravu kasu. Upiši iznos (i za šta, ne mora), pa + ili Enter; gore je ukupan zbir i broj naplata. Dodir na red vraća ga u polja za izmenu (✓ čuva, ponovni dodir na red odustaje); prevuci red ulevo → Izbriši (ide u korpu). Kad predaš novac, dole Predato → potvrda: spisak se prazni, a cela predaja ide u korpu i odatle može da se vrati. Nije povezana sa terminima ni hotelom; ulazi u rezervnu kopiju.' },
     { t:'Hotel kartica', c:'U naslovu, pored broja hotela, piše koliko je zamena izvršeno (redovi finansija sa iznosom Zamena i završeni termini). Podaci (ispod slika) i Finansije su svaki na svojoj tamnijoj traci. Duga adresa: dodir raširi polje preko celog reda da se vidi cela; izlazak ga vraća u jedan red. 🤖 AI gore: kad dodaš sliku, AI pročita gumu (dimenzija, brend, godina — u okvir po oznaci 3PMSF) i tablicu i upiše ih samo u prazna polja, zeleno označeno — proveri; dodir na 🤖 isključuje/uključuje čitanje. God. = godina proizvodnje gume (DOT). Dole su 📷 Slikaj i 🖼️ Galerija (slike vozila idu u karticu), zatim Zakaži, Zamena sezone, Otkaži i Sačuvaj. Redom: Ime i prezime | Adresa, Telefon | Mesto (broj gde su gume), Auto | Registracija; zatim žuti okvir ☀️ Letnje i plavi ❄️ Zimske — svaki sa Dimenzija | Brend | Felna (dimenziju kucaš samo ciframa na brojevnoj tastaturi, npr. 2156517 → 215/65 R17; dodir na Alu ili Čelik označi kvačicom, ponovni dodir skida; bez oznake = bez felne); pa Status (Aktivan, ⚠ Sporno, ✓ Završeno), „Kod nas su: letnje / zimske / ništa“, U hotelu od | Cena mesečno i Napomena. Gore su slike auta, iste kao u terminima: 📷 Slikaj i 🖼️ Galerija dodaju slike direktno u kartici, dodir na sliku otvara pregled (★ profilna, 🗑 briše); sve se čuva dugmetom Sačuvaj. Polja rade kao u terminu: dodir isprazni polje, a stari tekst se vidi osenčen (kucanje ili diktat upisuje novo, drugi dodir vraća stari tekst za ispravku, Backspace u praznom polju = korak nazad u prethodno polje, strelica na tastaturi = sledeće polje). Napomena se otvara preko celog ekrana kao u terminu (↶ ↷ Sačuvaj; nazad čuva samo napomenu, ostale izmene čekaju Sačuvaj). Ispod su finansije: zbir hotel, zamena i ukupno (Ukupno istaknuto tamno, na tamnijoj traci); redovi su po sezonama (traka sa nazivom sezone i zbirom; zima plavo, leto žuto, po datumu reda), i svaki red kao polja Datum, Hotel, Zamena i Napomena — dodir na polje i menjaš direktno, zbir se odmah preračuna; ＋ Dodaj red dodaje nov red na vrh; prevuci red ulevo → Izbriši (↶ vraća, konačno tek na Sačuvaj). Red sa oznakom „📅 iz termina“ je završen termin: izmena tu menja i taj termin (iznos = hotel + zamena), a briše se u Završenom. Dole: 📅 Zakaži (kartica se sačuva, pa kalendar i sat, pa nov termin sa podacima kartice — upisuje se na Sačuvaj), Zamena sezone (letnje ↔ zimske; red u finansije upisuješ sam), Otkaži, Sačuvaj.' },
     { t:'Termin hotel klijenta', c:'Na kartici na početnom ekranu pored imena piše 🏨 i broj (⚠ ako je sporno). U terminu je traka „Hotel br. … · kod nas: …“ — dodir otvara hotel karticu. Iznos je podeljen: Zamena + Hotel = Ukupno; Hotel se sam predloži (meseci od prošle zamene × cena), a možeš ga promeniti. Kad termin prevučeš u Završeno, klijent prelazi u „zamenjeno ove sezone“, a kod nas se okrene (posle zimske zamene: letnje). Ako termin vratiš iz Završenog, vrati se i to.' },
     { t:'Nesačuvana izmena', c:'Ako u terminu nešto promeniš pa ga zatvoriš bez čuvanja (✕, Otkaži, dodir van ili korak nazad), aplikacija pita „Sačuvati izmene?“: Sačuvaj čuva, Otkaži izmene zatvara termin bez promene. Dodir van prozora ili korak nazad vraća u termin.' },
@@ -5547,6 +5671,7 @@ loadSettings();
 applyTheme(getTheme());
 loadItems();
 loadHotel(); hotelUvoz();   /* v40 */
+loadKasa();   /* v67 */
 trashPurgeExpired();
 render();
 Slike.ucitaj().then(ok=>{ if(!ok) return; vozilaPocisti(); if(formDraft && !formDraft.slike.length && formDraft.vozilo){ formDraft.slike = vozSlike(formDraft.vozilo); fhReset(); renderItemForm(); } render(); opisSlikaRun(); });
