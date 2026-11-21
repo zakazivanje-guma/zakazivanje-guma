@@ -2551,8 +2551,8 @@ function hkPush(){
 function hkUndo(d){
   hkPush(); if(!hkHist) return;
   const j = hkHist.i + d; if(j < 0 || j >= hkHist.s.length) return;
-  const a = document.activeElement; if(a && a.blur && a.closest && a.closest('#hkBackdrop')) a.blur();
-  hkHist.i = j; const sn = hkHist.s[j]; Object.assign(hkDraft, sn, { fin: JSON.parse(JSON.stringify(sn.fin||[])), slike: (sn.slike||[]).slice() }); renderHotelCard();
+  const a = document.activeElement, keep = urFocusId(a, 'hkBackdrop'); if(a && a.blur && a.closest && a.closest('#hkBackdrop')) a.blur();
+  hkHist.i = j; const sn = hkHist.s[j]; Object.assign(hkDraft, sn, { fin: JSON.parse(JSON.stringify(sn.fin||[])), slike: (sn.slike||[]).slice() }); renderHotelCard(); urRefocus(keep);
 }
 function hkBar(){
   const p = !!hkTimer;
@@ -2692,6 +2692,15 @@ function urSync(k){
   foot.classList.toggle('urmode', urEdit[k] && st.avail);
 }
 function urEnd(k){ urEdit[k] = false; urSync(k); }
+/* v60 (Zoran 21.11.): ↶ ↷ dok kucaš NE zatvara tastaturu — posle ponovnog crtanja isto polje dobija fokus (u istom dodiru,
+   pa Android drži tastaturu), bez osenčenja (gboard modul pri fokusu osenči — odmah se vraća tekst), kursor na kraj. */
+function urFocusId(a, bd){ return a && a.id && urTxt(a) && a.closest && a.closest('#'+bd) ? a.id : ''; }
+function urRefocus(id){
+  if(!id) return; const el = document.getElementById(id); if(!el) return;
+  try{ el.focus({ preventScroll:true }); }catch(e){ el.focus(); }
+  if(typeof disarmField === 'function') disarmField(el, true);
+  try{ const n = el.value.length; el.setSelectionRange(n, n); }catch(e){}
+}
 function urKey(el){ return el && el.closest ? (el.closest('#hkBackdrop') ? 'hk' : el.closest('#formBackdrop') ? 'f' : '') : ''; }
 const urTxt = el=> el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !/^(button|checkbox|radio|file)$/.test(el.type)));
 document.addEventListener('focusin', (e)=>{ const k = urKey(e.target); if(k && urTxt(e.target)){ urEdit[k] = true; urSync(k); } });
@@ -4430,11 +4439,11 @@ function formUndo(d){
   fhPush();
   if(!fh || !formDraft) return;
   const j = fh.i + d; if(j < 0 || j >= fh.s.length) return;
-  const a = document.activeElement; if(a && a.blur && a.closest && a.closest('#formBackdrop')) a.blur();
+  const a = document.activeElement, keep = urFocusId(a, 'formBackdrop'); if(a && a.blur && a.closest && a.closest('#formBackdrop')) a.blur();
   fh.i = j; const o = fh.s[j];
   DRAFT_FIELDS.forEach(k=>{ formDraft[k] = o[k]; }); formDraft.slike = o.slike.slice(); formDraft.vozilo = o.vozilo || formDraft.vozilo;
   if(cdIdx >= formDraft.slike.length) cdIdx = 0;
-  renderItemForm();
+  renderItemForm(); urRefocus(keep);
 }
 function fhBar(){
   const pend = !!fhTimer;
