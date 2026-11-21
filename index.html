@@ -906,6 +906,15 @@ body.noting .vw-screen, body.noting .cam-screen{ top:var(--note-h); }
 .zf .field:not(.miss):focus-within > label{ color:var(--frame-acc); }
 .zf.nap-full .zf-nap:focus-within{ border:none; background:transparent; box-shadow:none; animation:none; }
 @media (prefers-reduced-motion: reduce){ .zf .field:focus-within{ animation:none; } }
+/* v62: ista oznaka i za samostalna polja (glavni unos, pretrage, ručni unos sata, API ključ, ime slike) — bez pulsa,
+   jer se u njima ne prelazi iz polja u polje. Zamenjuje „mirno sivo“ iz v41. */
+:root, [data-theme]{ --focus-line:var(--frame-acc); --focus-ring:color-mix(in srgb, var(--frame-acc) 28%, transparent); }
+input:where(:not([type=checkbox],[type=radio],[type=file])):focus, textarea:focus, select:focus{ outline:2px solid var(--frame-acc) !important; outline-offset:-2px; box-shadow:0 0 0 3px var(--focus-ring); }
+.search-wrap:focus-within, .entry-input-wrap:focus-within{ box-shadow:inset 0 0 0 2px var(--frame-acc), 0 0 0 3px var(--focus-ring) !important; }
+.entry-row-input:focus-within .entry-input-wrap{ outline:none; }
+:is(.search-wrap, .entry-input-wrap) :is(input,textarea):focus{ box-shadow:none !important; }
+.vw-name input:focus{ outline:none !important; box-shadow:none; }
+.vw-name:focus-within{ border-radius:8px; box-shadow:0 0 0 2px rgba(255,255,255,.75), 0 0 0 5px rgba(255,255,255,.18); }
 .tp-b{ position:relative; }
 .tp-b.busy:not(.on){ background:color-mix(in srgb, var(--amber) 20%, var(--bg)); border-color:color-mix(in srgb, var(--amber) 55%, var(--line)); }
 .tp-n{ position:absolute; top:2px; right:4px; font-size:10.5px; font-weight:800; line-height:1; color:var(--amber); }
@@ -1136,6 +1145,8 @@ body.noting .vw-screen, body.noting .cam-screen{ top:var(--note-h); }
 .hk .hk-god label{ font-size:11.5px; font-weight:800; margin:0; }
 .hk .hk-god input{ width:62px; height:30px; padding:0 8px; border-radius:9px; border:1.5px solid color-mix(in srgb, var(--text) 18%, var(--line)); background:var(--pearl); color:var(--text); font:inherit; font-size:16px; font-weight:600; letter-spacing:0; text-align:center; box-sizing:border-box; outline:none; }
 .hk .field.ai-fill, .hk .hk-god.ai-fill input{ border-color:var(--green-deep) !important; box-shadow:0 0 0 2px color-mix(in srgb, var(--green-deep) 35%, transparent) !important; }
+/* v62: aktivno polje u hotel kartici — posle hotelskih pravila okvira, da ih ne pregaze */
+.hk .field:focus-within, .hk .hk-data .field:focus-within, .hk .hk-sez .field:focus-within, .hk .hf-row .field:focus-within{ border-color:var(--frame-acc); background:color-mix(in srgb, var(--frame-acc) 7%, var(--pearl)); box-shadow:inset 0 0 0 1px var(--frame-acc), 0 0 0 3px color-mix(in srgb, var(--frame-acc) 28%, transparent); }
 
 /* v45 (Zoran 18.11.): kvadrat sa brojem i bočna traka kao polje vremena na terminu (sporno ostaje crveno, na čekanju bledo) */
 .hl .hl-row, .hl .hl-row.ok{ border-left-color:var(--green-pale); }
@@ -5388,7 +5399,7 @@ function openHelpScreen(){
     { t:'Pretraga i prikaz', c:'"Pretraži" traži po imenu, autu, prečniku, napomeni, telefonu i iznosu, uvek i u zakazanim i u završenim (prvo zakazani), bez obzira na kvačice i druge oznake nad slovima (č, ë, é...), velika slova, ćirilicu ili latinicu i znakove između (crtica, tačka, razmak: „c4“ nalazi i „C-4“). Ikonica ▦/☰ menja prikaz između liste i mreže. Kartice su iste visine (4 na ekranu): gore ime i iznos, ispod vreme, pa u nizu auto · prečnik · telefon (dodir na broj zove), a napomena uvek u novom redu i dobija ostatak mesta. Crven kvadrat vremena = još neko ima isto vreme.' },
     { t:'Sortiranje', c:'Dugme ⇅ gore (pored prikaza i podešavanja) otvara „Sortiraj“: "Datum i vreme" ređa termine po danu, pa po vremenu. "Ručno (ručke)" prikaže ručku (⠿) desno na svakoj kartici: drži je i prevuci karticu na novo mesto, u okviru istog dana. Ručni redosled se pamti.' },
     { t:'Datumi', c:'Svako polje za datum (termin, hotel kartica, finansije) piše dan.mesec.godina. (npr. 18.11.2026.). Dodir na polje otvara kalendar telefona — on sam izgleda po jeziku telefona/Chrome-a.' },
-    { t:'Izmena podataka', c:'Dodir na polje ga osenči: Backspace te vrati na prethodno polje bez brisanja, a prvo slovo ili mikrofon zameni stari tekst novim. Drugi dodir vraća tekst u polje za uređivanje dela teksta. Ako izađeš bez unosa, stari tekst ostaje. Taster za brisanje na označenom ili praznom polju ne briše, nego te vrati na prethodno polje.' },
+    { t:'Izmena podataka', c:'Dodir na polje ga osenči: Backspace te vrati na prethodno polje bez brisanja, a prvo slovo ili mikrofon zameni stari tekst novim. Drugi dodir vraća tekst u polje za uređivanje dela teksta. Ako izađeš bez unosa, stari tekst ostaje. Taster za brisanje na označenom ili praznom polju ne briše, nego te vrati na prethodno polje. Polje u kom si ima okvir u boji teme; pri prelasku u njega (strelica, taster za brisanje ili dodir) kratko zatreperi, da odmah vidiš gde si.' },
     { t:'Obaveštenja', c:'Sve poruke aplikacije pojavljuju se gore, u okviru sa velikim slovima: zeleno kad je nešto urađeno, crveno kad nešto nije uspelo. Okvir nestane sam (posle 4 sekunde, greška posle 6).' },
     { t:'Brisanje prevlačenjem', c:'U prikazu spiska povuci karticu prstom ulevo: ispod nje se pojavi crveno dugme "Izbriši". Dodir na njega traži potvrdu, pa termin ide u korpu. Dodir bilo gde drugde vraća karticu na mesto.' },
     { t:'Korpa', c:'Obrisan termin i uklonjena hotel kartica (🏨) idu u korpu (Podešavanja → Korpa) i tamo čekaju zadati broj dana (podrazumevano 30; menja se gore u korpi), pa se sami trajno brišu. U korpi izabereš stavke, pa "Vrati" ili "Obriši trajno". Korpa ne ulazi u rezervnu kopiju.' },
