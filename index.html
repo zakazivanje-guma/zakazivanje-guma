@@ -1019,11 +1019,15 @@ input:where(:not([type=checkbox],[type=radio],[type=file])):focus, textarea:focu
 .ks-sum{ background:var(--green-deep); color:var(--on-accent); border-radius:18px; padding:14px 16px; display:flex; align-items:baseline; justify-content:space-between; }
 .ks-sum small{ font-size:13px; font-weight:700; opacity:.85; letter-spacing:.05em; } .ks-sum b{ font-size:34px; font-weight:800; letter-spacing:-.5px; }
 .ks-sub{ font-size:13.5px; color:var(--text-dim); margin:6px 4px 10px; min-height:18px; }
-.ks-in{ display:flex; gap:8px; margin-bottom:6px; }
+.ks-in{ display:flex; gap:8px; margin-bottom:6px; align-items:flex-end; }
+.ks-l{ display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:700; letter-spacing:.04em; color:var(--text-dim); min-width:0; }
+.ks-l.a{ width:110px; flex:none; } .ks-l.o{ flex:1; } .ks-l input{ width:100%; }
+.ks .ks-in .ks-l{ font-size:12px; font-weight:700; letter-spacing:.04em; color:var(--text-dim); text-transform:uppercase; font-family:inherit; line-height:16px; margin:0; padding:0; }
+.ks .ks-in .ks-l input{ margin:0 !important; height:50px !important; }
 .ks-in input{ min-width:0; border:1px solid var(--line); border-radius:12px; padding:12px; font-size:18px; background:var(--pearl,var(--bg-card)); color:var(--text); font-family:inherit; box-sizing:border-box; }
-.ks-in .a{ width:110px; flex:none; font-weight:800; } .ks-in .o{ flex:1; font-size:16px; }
+.ks-in input.a{ font-weight:800; } .ks-in input.o{ font-size:16px; }
 .ks-in input:focus{ outline:2px solid var(--green-deep); outline-offset:-1px; }
-.ks-in button{ flex:none; width:54px; border-radius:12px; border:none; background:var(--green-deep); color:var(--on-accent); font-size:24px; font-family:inherit; cursor:pointer; }
+.ks-in button{ flex:none; width:54px; height:50px; border-radius:12px; border:none; background:var(--green-deep); color:var(--on-accent); font-size:24px; font-family:inherit; cursor:pointer; }
 .ks .ks-body{ display:block; overflow:auto; padding:6px 14px; }
 .ks-list{ position:relative; }
 .ks-row{ position:relative; z-index:1; touch-action:pan-y; display:flex; align-items:center; gap:12px; width:100%; text-align:left; font-family:inherit; background:var(--bg-card); border:1px solid var(--line); border-radius:14px; padding:10px 14px; margin:0 0 8px; cursor:pointer; box-sizing:border-box; }
@@ -2681,7 +2685,7 @@ function renderHotelCard(){
   const F = 'autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next"';
   const FB = (k, l, st, type, extra)=> '<div class="field" data-k="'+k+'"'+(st?' style="'+st+'"':'')+' onclick="zfFocus(event,this)"><label>'+l+'</label><input id="hk_'+k+'" type="'+(type||'text')+'" '+(k==='tablica' ? F.replace('autocapitalize="off"','autocapitalize="characters"') : F)+' value="'+escapeHtml(d[k]==null?'':d[k])+'"'+(/oninput=/.test(extra||'') ? '' : ' oninput="hkSet(\''+k+'\', this.value)"')+(extra||'')+'></div>';
   /* v47 (Zoran 18.11.): dimenzija = brojevna tastatura; kucaš samo cifre (2156517), aplikacija upisuje 215/65 R17 */
-  const DIMX = k=> ' inputmode="numeric" placeholder="npr. 2156517" oninput="dimInput(this,event,\''+k+'\')"';
+  const DIMX = k=> ' inputmode="numeric" oninput="dimInput(this,event,\''+k+'\')"';
   /* registracija: tastatura odmah velika slova */
   const seg = (k, opts)=> '<div class="seg">'+opts.map(o=>'<button type="button" class="'+(String(d[k]||'')===o[0]?'on'+(o[0]==='sporno'?' sp':''):'')+'" onclick="hkSeg(\''+k+'\',\''+o[0]+'\')">'+o[1]+'</button>').join('')+'</div>';
   const fel = k=> '<div class="field hk-fel"><label>Felna</label><div class="fel">'+[['alu','Alu'],['celik','Čelik']].map(o=>'<button type="button" class="'+(d[k]===o[0]?'on':'')+'" onclick="hkSeg(\''+k+'\', hkDraft.'+k+'===\''+o[0]+'\' ? \'\' : \''+o[0]+'\')">'+(d[k]===o[0]?'✓':'')+o[1]+'</button>').join('')+'</div></div>';
@@ -2697,8 +2701,8 @@ function renderHotelCard(){
       '<div class="field hk-adr" data-k="adresa" onclick="zfFocus(event,this)"><label>Adresa</label><textarea id="hk_adresa" rows="1" '+F+' onfocus="hkAdrGrow(this,true)" onblur="hkAdrGrow(this,false)" oninput="this.value=this.value.replace(/[\\r\\n]+/g,\' \'); hkSet(\'adresa\', this.value); hkAdrGrow(this,true)">'+escapeHtml(d.adresa||'')+'</textarea></div></div>'+
     '<div class="zf-row">'+FB('telefon','Telefon','','tel',' inputmode="tel"')+FB('mesto','Mesto (broj)','','text',' inputmode="numeric"')+'</div>'+
     '<div class="zf-row">'+FB('auto','Auto')+FB('tablica','Registracija')+'</div>'+
-    '<div class="hk-sez l"><div class="hk-sez-t"><span>☀️ Letnje</span>'+'<span class="hk-god" onclick="zfFocus(event,this)"><label for="hk_godL">God.</label><input id="hk_godL" '+F+' inputmode="numeric" maxlength="4" placeholder="—" value="'+escapeHtml(d.godL||'')+'" oninput="this.value=this.value.replace(/\\D/g,\'\').slice(0,4); hkSet(\'godL\', this.value)"></span>'+'</div><div class="zf-row">'+FB('dimL','Dimenzija','','text',DIMX('dimL'))+FB('letnje','Brend')+fel('felnaL')+'</div></div>'+
-    '<div class="hk-sez z"><div class="hk-sez-t"><span>❄️ Zimske</span>'+'<span class="hk-god" onclick="zfFocus(event,this)"><label for="hk_godZ">God.</label><input id="hk_godZ" '+F+' inputmode="numeric" maxlength="4" placeholder="—" value="'+escapeHtml(d.godZ||'')+'" oninput="this.value=this.value.replace(/\\D/g,\'\').slice(0,4); hkSet(\'godZ\', this.value)"></span>'+'</div><div class="zf-row">'+FB('dimZ','Dimenzija','','text',DIMX('dimZ'))+FB('zimske','Brend')+fel('felnaZ')+'</div></div>'+
+    '<div class="hk-sez l"><div class="hk-sez-t"><span>☀️ Letnje</span>'+'<span class="hk-god" onclick="zfFocus(event,this)"><label for="hk_godL">God.</label><input id="hk_godL" '+F+' inputmode="numeric" maxlength="4" value="'+escapeHtml(d.godL||'')+'" oninput="this.value=this.value.replace(/\\D/g,\'\').slice(0,4); hkSet(\'godL\', this.value)"></span>'+'</div><div class="zf-row">'+FB('dimL','Dimenzija','','text',DIMX('dimL'))+FB('letnje','Brend')+fel('felnaL')+'</div></div>'+
+    '<div class="hk-sez z"><div class="hk-sez-t"><span>❄️ Zimske</span>'+'<span class="hk-god" onclick="zfFocus(event,this)"><label for="hk_godZ">God.</label><input id="hk_godZ" '+F+' inputmode="numeric" maxlength="4" value="'+escapeHtml(d.godZ||'')+'" oninput="this.value=this.value.replace(/\\D/g,\'\').slice(0,4); hkSet(\'godZ\', this.value)"></span>'+'</div><div class="zf-row">'+FB('dimZ','Dimenzija','','text',DIMX('dimZ'))+FB('zimske','Brend')+fel('felnaZ')+'</div></div>'+
     '<div class="field"><label>Status</label>'+seg('status',[['aktivan','Aktivan'],['sporno','⚠ Sporno'],['zavrseno','✓ Završeno']])+'</div>'+
     '<div class="field"><label>Kod nas su</label>'+seg('kod',[['letnje','☀️ Letnje'],['zimske','❄️ Zimske'],['','Ništa']])+'</div>'+
     '<div class="zf-row">'+FB('od','U hotelu od','','date')+FB('cena','Cena mesečno','','text',' inputmode="numeric"')+'</div>'+
@@ -3828,7 +3832,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 67; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 68; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -4669,7 +4673,7 @@ function renderTimePicker(){
   const hList = hl.length ? '<div class="tp-busy">Zauzeto: '+hl.map(x=>escapeHtml(x.vreme+' '+(x.ime||'bez imena'))).join(' · ')+'</div>' : '';
   if(tpKb){
     b.innerHTML = '<div class="tp"><div class="tp-head"><span class="t">Tačno vreme</span><span class="v" id="tpInV">--:--</span></div>'+
-      '<div class="tp-in-row"><input id="tpIn" class="tp-in" type="text" inputmode="numeric" enterkeyhint="done" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="npr. 1035" oninput="tpInInput()" onkeydown="if(event.key===\'Enter\'){event.preventDefault();tpInApply();}">'+
+      '<div class="tp-in-row"><input id="tpIn" class="tp-in" type="text" inputmode="numeric" enterkeyhint="done" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" oninput="tpInInput()" onkeydown="if(event.key===\'Enter\'){event.preventDefault();tpInApply();}">'+
       '<button type="button" class="tp-in-ok" id="tpInOk" onclick="tpInApply()" disabled>Upiši</button></div>'+
       '<div class="tp-in-hint" id="tpInHint">Ukucaj sat i minute, 24 sata: 1035 = 10:35, 9 = 09:00</div>'+
       '<button type="button" class="tp-x" onclick="tpKbSet(false)">Nazad na sate</button></div>';
@@ -5282,7 +5286,7 @@ function openSettingsSub(key){
   } else if(key==='apikey'){
     title='Gemini API ključ';
     body='<div class="field"><label>Google Gemini API ključ</label>'+
-      '<input id="sApiKey" type="password" enterkeyhint="done" onkeydown="if(event.key===\'Enter\'){ event.preventDefault(); saveApiKeySetting(); }" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" value="'+escapeHtml(getApiKey())+'" placeholder="AIza..."></div>'+
+      '<input id="sApiKey" type="password" enterkeyhint="done" onkeydown="if(event.key===\'Enter\'){ event.preventDefault(); saveApiKeySetting(); }" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" value="'+escapeHtml(getApiKey())+'"></div>'+
       '<div class="field-hint" style="margin-bottom:18px;">Ključ se čuva samo na ovom telefonu, u ovom pregledaču. Napraviš ga besplatno na aistudio.google.com (bez kartice) → Get API key. Potreban je za unos termina iz donje trake i za AI ćaskanje. Isti ključ kao u Kućnoj apoteci: kopiraj ga odande (Podešavanja) i nalepi ovde.</div>'+
       '<div class="modal-actions"><button class="save-btn" onclick="saveApiKeySetting()">Sačuvaj</button></div>'+
       aiFormatStatusHtml();
@@ -5315,8 +5319,9 @@ function openKasa(){
   b.innerHTML = '<div class="modal form-full zf ks"><div class="ff-head"><h2 class="serif">Privremena kasa</h2>'+
     '<button class="modal-close-x" onclick="closeKasa()" aria-label="Zatvori">✕</button></div>'+
     '<div class="ks-top"><div class="ks-sum"><small>UKUPNO</small><b id="ksSum">0</b></div><div class="ks-sub" id="ksSub"></div>'+
-    '<div class="ks-in"><input class="a" id="ksA" inputmode="numeric" enterkeyhint="done" placeholder="Iznos" '+F+'>'+
-    '<input class="o" id="ksO" enterkeyhint="done" placeholder="Za šta (ne mora)" '+F+'>'+
+    /* v68 (Zoran 21.11.): bez teksta-primera u poljima — opis stoji iznad polja */
+    '<div class="ks-in"><label class="ks-l a">Iznos<input class="a" id="ksA" inputmode="numeric" enterkeyhint="done" '+F+'></label>'+
+    '<label class="ks-l o">Za šta (ne mora)<input class="o" id="ksO" enterkeyhint="done" '+F+'></label>'+
     '<button type="button" id="ksAdd" onmousedown="event.preventDefault()" onclick="kasaAdd()" aria-label="Dodaj">+</button></div></div>'+
     '<div class="ff-body ks-body"><div class="ks-list" id="ksList"></div><div class="ks-hint" id="ksHint"></div></div>'+
     '<div class="ff-foot cd-foot"><button class="home-sq cd-save" id="ksDone" onclick="kasaPredato()"><span class="sq-box">✓</span>Predato</button></div></div>';
