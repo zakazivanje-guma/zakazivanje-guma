@@ -905,6 +905,9 @@ body.noting .vw-screen, body.noting .cam-screen{ top:var(--note-h); }
 .zf .field:focus-within, .zf .field.miss:focus-within{ position:relative; z-index:1; border-color:var(--frame-acc); background:color-mix(in srgb, var(--frame-acc) 7%, var(--bg-elevated)); box-shadow:inset 0 0 0 1px var(--frame-acc), 0 0 0 3px color-mix(in srgb, var(--frame-acc) 28%, transparent); animation:zfPuls .6s ease-out; }
 .zf .field:not(.miss):focus-within > label{ color:var(--frame-acc); }
 .zf.nap-full .zf-nap:focus-within{ border:none; background:transparent; box-shadow:none; animation:none; }
+.zf .field.zf-flash, .hk .hk-data .field.zf-flash, .hk .hk-sez .field.zf-flash, .hk .hf-row .field.zf-flash{ border-color:var(--frame-acc); box-shadow:inset 0 0 0 1px var(--frame-acc), 0 0 0 3px color-mix(in srgb, var(--frame-acc) 28%, transparent); animation:zfPuls .6s ease-out; }
+.zf .field.no-puls:focus-within{ animation:none; }
+.hk .hk-god.zf-flash input{ border-color:var(--frame-acc); box-shadow:0 0 0 3px color-mix(in srgb, var(--frame-acc) 28%, transparent); animation:zfPuls .6s ease-out; }
 @media (prefers-reduced-motion: reduce){ .zf .field:focus-within{ animation:none; } }
 /* v62: ista oznaka i za samostalna polja (glavni unos, pretrage, ručni unos sata, API ključ, ime slike) — bez pulsa,
    jer se u njima ne prelazi iz polja u polje. Zamenjuje „mirno sivo“ iz v41. */
@@ -2574,8 +2577,8 @@ function hkPush(){
 function hkUndo(d){
   hkPush(); if(!hkHist) return;
   const j = hkHist.i + d; if(j < 0 || j >= hkHist.s.length) return;
-  const a = document.activeElement, keep = urFocusId(a, 'hkBackdrop'); if(a && a.blur && a.closest && a.closest('#hkBackdrop')) a.blur();
-  hkHist.i = j; const sn = hkHist.s[j]; Object.assign(hkDraft, sn, { fin: JSON.parse(JSON.stringify(sn.fin||[])), slike: (sn.slike||[]).slice() }); renderHotelCard(); urRefocus(keep);
+  const a = document.activeElement, keep = urFocusId(a, 'hkBackdrop'), pre = urSigs('hkBackdrop'); if(a && a.blur && a.closest && a.closest('#hkBackdrop')) a.blur();
+  hkHist.i = j; const sn = hkHist.s[j]; Object.assign(hkDraft, sn, { fin: JSON.parse(JSON.stringify(sn.fin||[])), slike: (sn.slike||[]).slice() }); renderHotelCard(); urShow('hkBackdrop', pre, keep);
 }
 function hkBar(){
   const p = !!hkTimer;
@@ -2723,6 +2726,25 @@ function urRefocus(id){
   try{ el.focus({ preventScroll:true }); }catch(e){ el.focus(); }
   if(typeof disarmField === 'function') disarmField(el, true);
   try{ const n = el.value.length; el.setSelectionRange(n, n); }catch(e){}
+}
+/* v63 (Zoran 21.11.): ↶ ↷ vraćaju ceo termin/karticu (odluka v36), a okvir je ostajao na polju u kom si — nije se videlo šta je
+   vraćeno. Sada: prvo promenjeno polje (po redu na ekranu) dobija okvir i treperi; ako si kucao i to polje je tekstualno,
+   kursor i tastatura prelaze u njega; dugmad (felna, status), datum, vreme i slike samo zatrepere, kursor ostaje gde je bio. */
+function urFields(bd){ return [...document.querySelectorAll('#'+bd+' .field, #'+bd+' .hk-god')]; }
+function urSigs(bd){ return urFields(bd).map(f=>[...f.querySelectorAll('input,textarea')].map(i=>i.value).join('\u0001')+'|'+[...f.querySelectorAll('button')].map(b=>b.className).join(',')); }
+function urShow(bd, pre, keep){
+  const fs = urFields(bd), post = urSigs(bd);
+  let i = 0; while(i < post.length && i < pre.length && post[i] === pre[i]) i++;
+  if(i >= fs.length){ if(pre.length === post.length || !fs.length){ urRefocus(keep); return; } i = fs.length-1; }
+  const F = fs[i], full = !!document.querySelector('#'+bd+' .zf.nap-full');
+  const inp = F.querySelector('input:not([readonly]):not([type=hidden]):not([type=date]):not([type=time]), textarea:not([readonly])');
+  if(keep && !full && inp && inp.id && urTxt(inp)) urRefocus(inp.id);
+  else { const k = keep && document.getElementById(keep), kf = k && k.closest('.field');
+    if(kf && kf !== F){ kf.classList.add('no-puls'); setTimeout(()=>kf.classList.remove('no-puls'), 700); }
+    urRefocus(keep); }
+  if(full) return;
+  if(!F.contains(document.activeElement)){ F.classList.remove('zf-flash'); void F.offsetWidth; F.classList.add('zf-flash'); setTimeout(()=>F.classList.remove('zf-flash'), 1300); }
+  try{ F.scrollIntoView({ block:'nearest', behavior:'smooth' }); }catch(e){}
 }
 function urKey(el){ return el && el.closest ? (el.closest('#hkBackdrop') ? 'hk' : el.closest('#formBackdrop') ? 'f' : '') : ''; }
 const urTxt = el=> el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !/^(button|checkbox|radio|file)$/.test(el.type)));
@@ -3767,7 +3789,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 62; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 63; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -4462,11 +4484,11 @@ function formUndo(d){
   fhPush();
   if(!fh || !formDraft) return;
   const j = fh.i + d; if(j < 0 || j >= fh.s.length) return;
-  const a = document.activeElement, keep = urFocusId(a, 'formBackdrop'); if(a && a.blur && a.closest && a.closest('#formBackdrop')) a.blur();
+  const a = document.activeElement, keep = urFocusId(a, 'formBackdrop'), pre = urSigs('formBackdrop'); if(a && a.blur && a.closest && a.closest('#formBackdrop')) a.blur();
   fh.i = j; const o = fh.s[j];
   DRAFT_FIELDS.forEach(k=>{ formDraft[k] = o[k]; }); formDraft.slike = o.slike.slice(); formDraft.vozilo = o.vozilo || formDraft.vozilo;
   if(cdIdx >= formDraft.slike.length) cdIdx = 0;
-  renderItemForm(); urRefocus(keep);
+  renderItemForm(); urShow('formBackdrop', pre, keep);
 }
 function fhBar(){
   const pend = !!fhTimer;
@@ -5386,7 +5408,7 @@ function openHelpScreen(){
     { t:'Hotel kartica', c:'Podaci (ispod slika) i Finansije su svaki na svojoj tamnijoj traci. Duga adresa: dodir raširi polje preko celog reda da se vidi cela; izlazak ga vraća u jedan red. 🤖 AI gore: kad dodaš sliku, AI pročita gumu (dimenzija, brend, godina — u okvir po oznaci 3PMSF) i tablicu i upiše ih samo u prazna polja, zeleno označeno — proveri; dodir na 🤖 isključuje/uključuje čitanje. God. = godina proizvodnje gume (DOT). Dole su 📷 Slikaj i 🖼️ Galerija (slike vozila idu u karticu), zatim Zakaži, Zamena sezone, Otkaži i Sačuvaj. Redom: Ime i prezime | Adresa, Telefon | Mesto (broj gde su gume), Auto | Registracija; zatim žuti okvir ☀️ Letnje i plavi ❄️ Zimske — svaki sa Dimenzija | Brend | Felna (dimenziju kucaš samo ciframa na brojevnoj tastaturi, npr. 2156517 → 215/65 R17; dodir na Alu ili Čelik označi kvačicom, ponovni dodir skida; bez oznake = bez felne); pa Status (Aktivan, ⚠ Sporno, ✓ Završeno), „Kod nas su: letnje / zimske / ništa“, U hotelu od | Cena mesečno i Napomena. Gore su slike auta, iste kao u terminima: 📷 Slikaj i 🖼️ Galerija dodaju slike direktno u kartici, dodir na sliku otvara pregled (★ profilna, 🗑 briše); sve se čuva dugmetom Sačuvaj. Polja rade kao u terminu: dodir isprazni polje, a stari tekst se vidi osenčen (kucanje ili diktat upisuje novo, drugi dodir vraća stari tekst za ispravku, Backspace u praznom polju = korak nazad u prethodno polje, strelica na tastaturi = sledeće polje). Napomena se otvara preko celog ekrana kao u terminu (↶ ↷ Sačuvaj; nazad čuva samo napomenu, ostale izmene čekaju Sačuvaj). Ispod su finansije: zbir hotel, zamena i ukupno (Ukupno istaknuto tamno, na tamnijoj traci); redovi su po sezonama (traka sa nazivom sezone i zbirom; zima plavo, leto žuto, po datumu reda), i svaki red kao polja Datum, Hotel, Zamena i Napomena — dodir na polje i menjaš direktno, zbir se odmah preračuna; ＋ Dodaj red dodaje nov red na vrh; prevuci red ulevo → Izbriši (↶ vraća, konačno tek na Sačuvaj). Red sa oznakom „📅 iz termina“ je završen termin: izmena tu menja i taj termin (iznos = hotel + zamena), a briše se u Završenom. Dole: 📅 Zakaži (kartica se sačuva, pa kalendar i sat, pa nov termin sa podacima kartice — upisuje se na Sačuvaj), Zamena sezone (letnje ↔ zimske; red u finansije upisuješ sam), Otkaži, Sačuvaj.' },
     { t:'Termin hotel klijenta', c:'Na kartici na početnom ekranu pored imena piše 🏨 i broj (⚠ ako je sporno). U terminu je traka „Hotel br. … · kod nas: …“ — dodir otvara hotel karticu. Iznos je podeljen: Zamena + Hotel = Ukupno; Hotel se sam predloži (meseci od prošle zamene × cena), a možeš ga promeniti. Kad termin prevučeš u Završeno, klijent prelazi u „zamenjeno ove sezone“, a kod nas se okrene (posle zimske zamene: letnje). Ako termin vratiš iz Završenog, vrati se i to.' },
     { t:'Nesačuvana izmena', c:'Ako u terminu nešto promeniš pa ga zatvoriš bez čuvanja (✕, Otkaži, dodir van ili korak nazad), aplikacija pita „Sačuvati izmene?“: Sačuvaj čuva, Otkaži izmene zatvara termin bez promene. Dodir van prozora ili korak nazad vraća u termin.' },
-    { t:'↶ ↷ u terminu', c:'Dok menjaš, u donjem redu se umesto Slikaj/Galerija/Obriši (u hotel kartici Slikaj/Galerija/Zakaži) pojave široke strelice; izlazak iz polja ili dodir na sliku vraća običan red. Strelice vraćaju i ponavljaju izmene u celom terminu (polja, napomenu i slike), korak po korak. Strelica koja trenutno radi je tamno ispunjena; bleda sa isprekidanim okvirom znači da tog koraka nema. Korak je pauza u kucanju ili diktatu, ili jedna radnja (vreme, slika). Dodir na strelicu skloni tastaturu — tako mikrofon na tastaturi ostaje ispravan.' },
+    { t:'↶ ↷ u terminu', c:'Dok menjaš, u donjem redu se umesto Slikaj/Galerija/Obriši (u hotel kartici Slikaj/Galerija/Zakaži) pojave široke strelice; izlazak iz polja ili dodir na sliku vraća običan red. Strelice vraćaju i ponavljaju izmene u celom terminu (polja, napomenu i slike), korak po korak. Polje koje se upravo vratilo dobija okvir i kratko zatreperi; ako si kucao, kursor prelazi u njega (dugmad kao Felna, datum i slike samo zatrepere). Strelica koja trenutno radi je tamno ispunjena; bleda sa isprekidanim okvirom znači da tog koraka nema. Korak je pauza u kucanju ili diktatu, ili jedna radnja (vreme, slika). Dodir na strelicu ne zatvara tastaturu.' },
     { t:'Više auta', c:'Ako klijent iz Završenog ima više auta, pri novom terminu („Klijent već postoji“) biraš koji auto vraćaš — sa njegovim slikama i registracijom. Kad glasom kažeš i auto („Petar, Golf…“), aplikacija sama izabere taj auto.' },
     { t:'Kad nešto nedostaje', c:'Datum, vreme i ime su obavezni. Ako AI ne prepozna neko od njih, otvori se izmena sa onim što je razumeo; šta nije uneto ima crven okvir i oznaku „nije uneto“. Termin se čuva tek kad dopuniš obavezno.' },
     { t:'Google kalendar', c:'Podešavanja → Google kalendar → Poveži (prvi put izabereš nalog i dozvoliš). Posle toga se budući zakazani termini sami upisuju u Google kalendar, a izmena ili brisanje ovde menja i kalendar; obrisani nestaju iz kalendara, a završeni tamo ostaju. Završavanje i vraćanje iz Završenog ne otvaraju Google-ov prozor. Kalendar šalje podsetnik na zaključan ekran (15 min, 30 min, 1 h ili 2 h pre, biraš u Podešavanjima). Google ponekad ponovo traži potvrdu: posle čuvanja na trenutak iskoči Google-ov prozor, ili gore piše "Kalendar čeka" pa dodirneš Pošalji.' },
