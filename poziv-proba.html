@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="sr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proba: spisak poziva</title>
+<!-- Proba 21.11.2026: da li Chrome na Zoranovom telefonu može da otvori spisak poziva (Nedavni) umesto tastature.
+     Nije deo aplikacije; briše se posle probe. -->
+<style>
+  body{ margin:0; padding:16px; font:17px/1.4 system-ui,sans-serif; background:#EAE1C7; color:#2B2B24; }
+  h1{ font-size:21px; margin:4px 0 6px; }
+  p{ font-size:14.5px; color:#5d5a4c; margin:0 0 14px; }
+  a{ display:block; margin:0 0 12px; padding:16px 14px; border-radius:14px; background:#FBF8EF; border:1.5px solid #CDBF98; color:#2B2B24; text-decoration:none; font-weight:700; box-shadow:0 2px 7px rgba(43,43,36,.12); }
+  a small{ display:block; font-weight:400; font-size:13px; color:#6b6756; margin-top:3px; }
+  a.base{ background:#28402F; color:#fff; border-color:#28402F; } a.base small{ color:#d9e3da; }
+</style>
+</head>
+<body>
+<h1>Proba: spisak poziva</h1>
+<p>Dodirni jedno po jedno dugme. Posle svakog se vrati ovde nazad i zapamti broj. Javi koje dugme je otvorilo spisak poziva (Nedavni), a ne tastaturu. Ako se ništa ne desi, i to je odgovor.</p>
+<a href="intent:#Intent;action=android.intent.action.VIEW;type=vnd.android.cursor.dir/calls;end">1 · Spisak poziva (opšte)<small>Android: prikaži listu poziva</small></a>
+<a href="intent:#Intent;action=android.intent.action.VIEW;type=vnd.android.cursor.dir/calls;package=com.android.contacts;end">2 · Spisak poziva — Xiaomi Telefon<small>isto, usmereno na Xiaomi aplikaciju Telefon</small></a>
+<a href="intent:#Intent;action=android.intent.action.VIEW;type=vnd.android.cursor.dir/calls;package=com.google.android.dialer;end">3 · Spisak poziva — Google Telefon<small>isto, usmereno na Google aplikaciju Telefon</small></a>
+<a href="intent://call_log/calls#Intent;scheme=content;action=android.intent.action.VIEW;end">4 · Spisak poziva (adresa)<small>preko adrese liste poziva</small></a>
+<a href="intent:#Intent;action=android.intent.action.CALL_BUTTON;end">5 · Dugme „Pozovi“<small>kao dugme za poziv na slušalici — neki telefoni otvore Nedavne</small></a>
+<a class="base" href="tel:">6 · Kao sada (tastatura)<small>za poređenje</small></a>
+</body>
+</html>
