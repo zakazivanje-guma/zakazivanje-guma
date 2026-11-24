@@ -2639,6 +2639,11 @@ function openHotelCard(id, fromTermin){
   document.body.appendChild(b);
   renderHotelCard();
   const fn = hkCloseFn = ()=>{
+    /* v72 (Zoran 24.11.): korak nazad posle „Dodaj red“ (red još prazan) = odustajanje od reda — kartica ostaje otvorena na Finansijama */
+    const ni = (!hkNoAsk && hkDraft) ? hkDraft.fin.findIndex(r=> r._nov && !r.tid && !(normIznos(r.hotel)||0) && !(normIznos(r.zamena)||0) && !String(r.napomena||'').trim()) : -1;
+    if(ni >= 0){ const stay = ()=>{ if(hkCloseFn !== fn) return; pushOverlay(fn); const a = document.activeElement; if(a && a.blur) a.blur();
+        hkDraft.fin.splice(ni, 1); hkPush(); hkTab = 'f'; renderHotelCard(); showNote('Nov red je odbačen.'); };
+      if(suppressPopstateCount > 0) afterBackQ.push(stay); else stay(); return; }
     if(hkDirty()){ const ask = ()=>{ if(hkCloseFn !== fn) return; pushOverlay(fn); askSaveHotel(); }; if(suppressPopstateCount > 0) afterBackQ.push(ask); else ask(); return; }
     const x = document.getElementById('hkBackdrop'); if(x) x.remove();
     hkDraft = null; hkId = null; hkCloseFn = null; hkNapFull = false; hkNapCloseFn = null; hkNapIdx = -1;
@@ -3013,7 +3018,7 @@ function hkFinSet(i, k, v){
 }
 function hkFinAdd(){
   if(!hkDraft) return;
-  hkDraft.fin.unshift({ tid:'', datum: todayISO(), hotel:'', zamena:'', napomena:'' });
+  hkDraft.fin.unshift({ tid:'', datum: todayISO(), hotel:'', zamena:'', napomena:'', _nov:1 });   /* _nov: korak nazad odbacuje prazan nov red (v72) */
   hkPush(); hkTab = 'f'; renderHotelCard();
   const el = document.getElementById('hf_0_hotel'); if(el){ el.scrollIntoView({ block:'center' }); el.focus(); }
 }
@@ -3947,7 +3952,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 71; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 72; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
