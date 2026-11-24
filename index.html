@@ -840,6 +840,14 @@ input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:tex
 .vw-img{ flex:1; min-height:0; position:relative; overflow:hidden; touch-action:none; }
 .vw-img img{ max-width:100%; max-height:100%; display:block; user-select:none; -webkit-user-drag:none; pointer-events:none; }
 .vw-bot{ flex:none; padding:14px 16px calc(22px + env(safe-area-inset-bottom)); text-align:center; }
+.vw-btns{ display:flex; gap:10px; justify-content:center; }   /* v75 */
+.vw-prof.vw-arr{ background:#C62828; color:#fff; }
+.vw-mk-x{ height:42px; padding:0 16px; border-radius:999px; border:1px solid #555; background:transparent; color:#fff; font-size:15px; font-family:inherit; cursor:pointer; }
+.vw-prof.vw-mk-save{ height:42px; padding:0 18px; font-size:15px; } .vw-mk-save.dim{ opacity:.4; }
+.vw-prof.vw-mk-rm{ background:#2b2b2b; color:#ff6b6b; }
+.vw-mk-pad{ position:absolute; inset:0; z-index:3; touch-action:none; }
+.sw-arrow{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:1; transform-origin:50% 50%; will-change:transform; }
+.sw-arrow.zm-anim{ transition:transform .22s ease; }
 .vw-prof{ height:50px; padding:0 24px; border-radius:999px; border:none; background:var(--green-deep); color:var(--on-accent); font-weight:700; font-size:15px; font-family:inherit; cursor:pointer; }
 .vw-prof:disabled{ opacity:.45; }
 .vw-hint{ color:#aaa; font-size:12.5px; margin-top:10px; }
@@ -1591,7 +1599,7 @@ function persistChecked(key, val){ if(!lsSet(key, val)){ warnSaveFailed(); retur
 function buildBackup(){
   /* v36: slike vozila (IndexedDB) idu u kopiju posebno, jednom po vozilu */
   const vozila = [...SLIKE.keys()].map(id=>{ const o = VOPIS.get(id) || {}; return { id: id, slike: SLIKE.get(id).slice(), opis: o.opis || '', sig: o.sig || '' }; });
-  return { app:'zakazivanje-guma', version:1, exportedAt: new Date().toISOString(), items: items, vozila: vozila, hotel: hotel, kasa: kasa, slikeNazivi: PNAZ, settings: settings, backupIntervalDays: getBackupIntervalDays() };
+  return { app:'zakazivanje-guma', version:1, exportedAt: new Date().toISOString(), items: items, vozila: vozila, hotel: hotel, kasa: kasa, slikeNazivi: PNAZ, slikeStrelice: PSTR, settings: settings, backupIntervalDays: getBackupIntervalDays() };
 }
 
 /* v54 (uzor Troškovi v34/v37): „Podeli kopiju“ — Androidov meni za deljenje (Google Drive, mejl…). Chrome ne deli .json
@@ -1776,6 +1784,7 @@ function applyBackup(backup){
   voz.forEach(x=>{ if(x.opis) VOPIS.set(x.id, { opis: x.opis, sig: x.sig || '' }); else VOPIS.delete(x.id); Slike.postavi(x.id, x.slike.filter(Boolean)); });
   void used;
   if(backup.slikeNazivi && typeof backup.slikeNazivi === 'object'){ PNAZ = Object.assign({}, PNAZ, backup.slikeNazivi); persistChecked('zg:slikeNazivi', JSON.stringify(PNAZ)); }   /* v49 */
+  if(backup.slikeStrelice && typeof backup.slikeStrelice === 'object'){ PSTR = Object.assign({}, PSTR, backup.slikeStrelice); persistChecked('zg:slikeStrelice', JSON.stringify(PSTR)); }   /* v75 */
   if(backup.settings){
     const prevTheme = getTheme();
     settings = Object.assign(settings, backup.settings);
@@ -1846,6 +1855,16 @@ function setPicNaziv(u, n){
   const k = picKey(u), v = String(n||'').trim(), old = PNAZ[k];
   if(v) PNAZ[k] = v; else delete PNAZ[k];
   if(!persistChecked('zg:slikeNazivi', JSON.stringify(PNAZ))){ if(old) PNAZ[k] = old; else delete PNAZ[k]; return false; }
+  return true;
+}
+/* v75 (Zoran 24.11., kao Stanje guma v10): 📍 strelica na slici — pripada SLICI (ključ kao naziv), čuva se odmah, ide u bekap */
+let PSTR = {};
+try{ const v = JSON.parse(localStorage.getItem('zg:slikeStrelice')||'{}'); if(v && typeof v === 'object') PSTR = v; }catch(e){ PSTR = {}; }
+function picStrel(u){ return PSTR[picKey(u)] || null; }
+function setPicStrel(u, st){
+  const k = picKey(u), old = PSTR[k];
+  if(st) PSTR[k] = st; else delete PSTR[k];
+  if(!persistChecked('zg:slikeStrelice', JSON.stringify(PSTR))){ if(old) PSTR[k] = old; else delete PSTR[k]; return false; }
   return true;
 }
 function picSig(arr){ return (arr && arr.length) ? arr.length+':'+arr.map(p=>p.length).join(',') : ''; }
@@ -2006,17 +2025,19 @@ function openViewer(i){
   const el = document.createElement('div'); el.className = 'vw-screen'; el.id = 'vwScreen';
   document.body.appendChild(el);
   renderViewer();
-  vwCloseFn = ()=>{ const nm = document.getElementById('vwName'); if(nm) viewerNaziv(nm.value, +nm.dataset.i); const x = document.getElementById('vwScreen'); if(x) x.remove(); vwCloseFn = null; vwStrip = null; };
+  vwCloseFn = ()=>{ const nm = document.getElementById('vwName'); if(nm) viewerNaziv(nm.value, +nm.dataset.i); const x = document.getElementById('vwScreen'); if(x) x.remove(); vwCloseFn = null; vwStrip = null; vwMk = null; vwMkFn = null; };
   pushOverlay(vwCloseFn);
 }
 function renderViewer(){
   const el = document.getElementById('vwScreen'); if(!el || !picArr().length) return;
+  if(vwMk) return renderMark(el);   /* v75: označavanje strelicom */
   const n = picArr().length;
   /* v50 (Zoran 19.11.): naziv u gornjem redu sa brojem slika i korpom, bez naslova */
   el.innerHTML = '<div class="vw-top"><label class="vw-name" onclick="event.stopPropagation()"><span class="t"><input id="vwName" type="text" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" enterkeyhint="done" placeholder="naziv slike" onchange="viewerNaziv(this.value, +this.dataset.i)" onkeydown="if(event.key===\'Enter\'){ event.preventDefault(); this.blur(); }"></span><span class="ed">✎</span></label>'+
     '<b id="vwCnt"></b><button class="cam-btn vw-del" onclick="viewerDelete()" aria-label="Obriši sliku">🗑</button></div>'+
     '<div class="vw-img">'+stripHtml(picArr(), 'contain')+'</div>'+
-    '<div class="vw-bot"><button class="vw-prof" id="vwProf" onclick="viewerSetProfile()"></button>'+
+    '<div class="vw-bot"><div class="vw-btns"><button class="vw-prof" id="vwProf" onclick="viewerSetProfile()"></button>'+
+    '<button class="vw-prof vw-arr" id="vwArr" onclick="markOpen()">📍 Strelica</button></div>'+
     '<div class="vw-hint">'+(n>1 ? '‹ prevuci › · ' : '')+'dva prsta: uvećaj i okreni · dodir na sliku = nazad</div></div>';
   vwStrip = makeStrip(el.querySelector('.sw-strip'), { idx:vwIdx, zoom:true, onIdx:(i)=>{ vwIdx = i; viewerBar(); }, onTap:closeViewer });
   viewerBar();
@@ -2037,6 +2058,80 @@ function viewerNaziv(v, i){
 function viewerGo(d){ if(vwStrip) vwStrip.go(vwIdx + d); }
 function closeViewer(){ const nm = document.getElementById('vwName'); if(nm && document.activeElement === nm) nm.blur(); if(vwCloseFn) closeOverlay(vwCloseFn); }
 /* „Postavi kao profilnu“ odmah čuva postojeći termin (kao Gde sam ostavio v5); pregled ostaje otvoren na toj slici (★) */
+/* v75 (Zoran 24.11., kao Stanje guma v10): 📍 Strelica — Otkaži · Dodirni mesto · Sačuvaj; dodir = vrh strelice, prevlačenje kružića = okret;
+   „nazad“ = Otkaži. Strelica pripada slici i čuva se odmah (kao naziv slike). */
+let vwMk = null, vwMkFn = null;
+function markOpen(){
+  const A = picArr(); if(!A.length || vwMk) return;
+  const cur = picStrel(A[vwIdx]);
+  vwMk = { idx: vwIdx, u: A[vwIdx], s: cur ? Object.assign({}, cur) : null, orig: JSON.stringify(cur) };
+  vwMkFn = ()=>{ vwMk = null; vwMkFn = null; renderViewer(); };
+  pushOverlay(vwMkFn);
+  renderViewer();
+}
+function markCancel(){ if(vwMkFn) closeOverlay(vwMkFn); }
+function markChanged(){ return !!vwMk && JSON.stringify(vwMk.s) !== vwMk.orig; }
+function renderMark(el){
+  const s = vwMk.s;
+  el.innerHTML = '<div class="vw-top"><button class="vw-mk-x" onclick="markCancel()">Otkaži</button><b>Dodirni mesto</b>'+
+    '<button class="vw-prof vw-mk-save'+(markChanged()?'':' dim')+'" id="vwMkSave" onclick="markSave()">Sačuvaj</button></div>'+
+    '<div class="vw-img" id="vwMkImg">'+stripHtml([vwMk.u], 'contain', true, s)+'<div class="vw-mk-pad" id="vwMkPad"></div></div>'+
+    '<div class="vw-bot"><button class="vw-prof vw-mk-rm" onclick="markRemove()"'+(s ? '' : ' style="visibility:hidden"')+'>Ukloni strelicu</button>'+
+    '<div class="vw-hint">dodir = vrh strelice · prevuci kružić da okreneš</div></div>';
+  markWire(document.getElementById('vwMkPad'));
+}
+function markRedraw(){
+  const sl = document.querySelector('#vwMkImg .sw-slide'); if(!sl) return;
+  const old = sl.querySelector('.sw-arrow'); if(old) old.remove();
+  if(vwMk.s) sl.insertAdjacentHTML('beforeend', arrowSvg(vwMk.s, 'contain', true));
+  const b = document.getElementById('vwMkSave'); if(b) b.classList.toggle('dim', !markChanged());
+}
+function markBox(){
+  const box = document.getElementById('vwMkImg'), im = box && box.querySelector('img'); if(!box || !im) return null;
+  const R = box.getBoundingClientRect(), nw = im.naturalWidth || 3, nh = im.naturalHeight || 4, k = Math.min(R.width/nw, R.height/nh);
+  const w = nw*k, h = nh*k; return { x: R.left + (R.width-w)/2, y: R.top + (R.height-h)/2, w, h, r: nw/nh };
+}
+function markWire(pad){
+  if(!pad) return;
+  let g = null;
+  pad.addEventListener('touchstart', (e)=>{
+    const t = e.touches[0], b = markBox(); if(!t || !b || e.touches.length > 1){ g = null; return; }
+    g = { x: t.clientX, y: t.clientY, m: 'tap' };
+    if(vwMk.s){
+      const tipX = b.x + vwMk.s.x*b.w, tipY = b.y + vwMk.s.y*b.h, a = vwMk.s.a*Math.PI/180;
+      const ex = tipX + Math.cos(a)*b.w/5, ey = tipY + Math.sin(a)*b.w/5;
+      if(Math.hypot(t.clientX-ex, t.clientY-ey) < 38) g = { m: 'rot', tipX, tipY };
+    }
+  }, {passive:true});
+  pad.addEventListener('touchmove', (e)=>{
+    const t = e.touches[0]; if(!g || !t) return;
+    if(g.m === 'rot'){
+      if(Math.hypot(t.clientX-g.tipX, t.clientY-g.tipY) < 8) return;
+      vwMk.s.a = Math.round(Math.atan2(t.clientY-g.tipY, t.clientX-g.tipX)*180/Math.PI); markRedraw();
+    } else if(Math.hypot(t.clientX-g.x, t.clientY-g.y) > 12) g.m = 'none';
+  }, {passive:true});
+  pad.addEventListener('touchend', (e)=>{
+    const gg = g; g = null; if(!gg) return; e.preventDefault();
+    if(gg.m !== 'tap') return;
+    const b = markBox(); if(!b) return;
+    const cl = (v)=>Math.max(0, Math.min(1, v)), x = Math.round(cl((gg.x-b.x)/b.w)*1000)/1000, y = Math.round(cl((gg.y-b.y)/b.h)*1000)/1000;
+    if(vwMk.s){ vwMk.s.x = x; vwMk.s.y = y; markRedraw(); return; }
+    const dx = (0.5-x)*b.w, dy = (0.5-y)*b.h;   /* rep ka sredini slike */
+    const a = Math.hypot(dx, dy) < 4 ? 135 : Math.round(Math.atan2(dy, dx)*180/Math.PI);
+    vwMk.s = { x, y, a, r: Math.round(b.r*1000)/1000 };
+    renderViewer();
+  });
+  pad.addEventListener('touchcancel', ()=>{ g = null; });
+}
+function markRemove(){ if(!vwMk) return; vwMk.s = null; renderViewer(); }
+function markSave(){
+  if(!vwMk || !markChanged()) return;
+  const u = vwMk.u, s = vwMk.s;
+  if(!setPicStrel(u, s)){ showBanner('Strelica NIJE sačuvana (nema mesta na telefonu).'); return; }
+  closeOverlay(vwMkFn);   /* pregled se vraća sa strelicom */
+  if(picHK()) renderHotelCard(); else if(formDraft) renderItemForm();
+  showNote(s ? 'Strelica je sačuvana.' : 'Strelica je uklonjena.');
+}
 function viewerSetProfile(){
   if(!picArr().length || vwIdx === 0) return;
   const A = picArr(), p = A.splice(vwIdx, 1)[0];
@@ -2050,10 +2145,25 @@ function viewerSetProfile(){
 /* Traka slika (kartica: samo listanje; pregled: i uvećanje/okretanje sa dva prsta, samo za gledanje).
    Jedan prst: slika prati prst, dovoljno daleko ili brz potez = sledeća, inače se vrati (na krajevima otpor).
    Uvećano: jedan prst pomera sliku. Dvostruki dodir: uvećaj 2,5× na tom mestu / vrati ceo prikaz. Obican dodir: onTap. */
-function stripHtml(arr, fit){
-  return '<div class="sw-strip"><div class="sw-track">'+arr.map((u,i)=>'<div class="sw-slide">'+(i===0?'<span class="prof-star" title="Profilna slika">★</span>':'')+
+function stripHtml(arr, fit, edit, st){
+  return '<div class="sw-strip"><div class="sw-track">'+arr.map((u,i)=>'<div class="sw-slide">'+(i===0 && !edit?'<span class="prof-star" title="Profilna slika">★</span>':'')+
     (fit!=='contain' && picNaziv(u) ? '<span class="pic-cap'+(i===0?'':' p0')+'">'+escapeHtml(picNaziv(u))+'</span>' : '')+
-    '<img src="'+u+'" draggable="false"'+(fit==='contain'?' style="max-width:100%;max-height:100%;display:block;user-select:none;-webkit-user-drag:none"':'')+'></div>').join('')+'</div></div>';
+    '<img src="'+u+'" draggable="false"'+(fit==='contain'?' style="width:100%;height:100%;object-fit:contain;display:block;user-select:none;-webkit-user-drag:none"':'')+'>'+
+    arrowSvg(st !== undefined ? st : picStrel(u), fit, edit)+'</div>').join('')+'</div></div>';
+}
+function arrowGeo(s){
+  const W = 1000, H = Math.round(W/(s.r||0.75)), L = W/5, a = (s.a||0)*Math.PI/180, ux = Math.cos(a), uy = Math.sin(a);
+  const tx = s.x*W, ty = s.y*H; return { W, H, L, tx, ty, ex: tx+ux*L, ey: ty+uy*L, ux, uy };
+}
+function arrowSvg(s, fit, edit){
+  if(!s) return '';
+  const g = arrowGeo(s), hs = g.L*0.38, bx = g.tx+g.ux*hs, by = g.ty+g.uy*hs, nx = -g.uy*hs*0.62, ny = g.ux*hs*0.62, w = g.L*0.085, o = g.L*0.05;
+  const f = (v)=>Math.round(v*10)/10, head = f(g.tx)+','+f(g.ty)+' '+f(bx+nx)+','+f(by+ny)+' '+f(bx-nx)+','+f(by-ny);
+  const line = (c, sw)=>'<line x1="'+f(g.ex)+'" y1="'+f(g.ey)+'" x2="'+f(bx)+'" y2="'+f(by)+'" stroke="'+c+'" stroke-width="'+f(sw)+'"/>';
+  return '<svg class="sw-arrow" viewBox="0 0 '+g.W+' '+g.H+'" preserveAspectRatio="xMidYMid '+(fit==='cover'||fit!=='contain'?'slice':'meet')+'"><g stroke-linecap="round" stroke-linejoin="round">'+
+    line('#fff', w+o*2)+'<polygon points="'+head+'" fill="#fff" stroke="#fff" stroke-width="'+f(o*2)+'"/>'+line('#FF1A1A', w)+'<polygon points="'+head+'" fill="#FF1A1A"/>'+
+    (edit ? '<circle cx="'+f(g.ex)+'" cy="'+f(g.ey)+'" r="'+f(g.L*0.17)+'" fill="rgba(255,255,255,.25)" stroke="#fff" stroke-width="'+f(g.L*0.03)+'" stroke-dasharray="'+f(g.L*0.06)+' '+f(g.L*0.045)+'"/>' : '')+
+    '</g></svg>';
 }
 function makeStrip(box, o){
   if(!box) return null;
@@ -2064,7 +2174,8 @@ function makeStrip(box, o){
   const img = ()=> slides[idx] && slides[idx].querySelector('img');
   const place = (dx, anim)=>{ track.classList.toggle('anim', !!anim); track.style.transform = 'translate3d('+(-idx*W() + (dx||0))+'px,0,0)'; };
   const zApply = (anim)=>{ const im = img(); if(!im) return; im.classList.toggle('zm-anim', !!anim);
-    im.style.transform = (z.s===1 && !z.r && !z.tx && !z.ty) ? '' : 'translate('+z.tx+'px,'+z.ty+'px) rotate('+z.r+'rad) scale('+z.s+')'; };
+    im.style.transform = (z.s===1 && !z.r && !z.tx && !z.ty) ? '' : 'translate('+z.tx+'px,'+z.ty+'px) rotate('+z.r+'rad) scale('+z.s+')';
+    const ar = slides[idx].querySelector('.sw-arrow'); if(ar){ ar.classList.toggle('zm-anim', !!anim); ar.style.transform = im.style.transform; } };   /* v75: strelica prati uvećanje */
   const zClamp = ()=>{ z.s = Math.max(1, Math.min(5, z.s)); if(z.s===1){ z.tx = 0; z.ty = 0; return; }
     const mx = (z.s-1)*box.clientWidth/2 + 40, my = (z.s-1)*box.clientHeight/2 + 40;
     z.tx = Math.max(-mx, Math.min(mx, z.tx)); z.ty = Math.max(-my, Math.min(my, z.ty)); };
@@ -4050,7 +4161,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 74; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 75; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -5777,7 +5888,7 @@ function openHelpScreen(){
     { t:'Izmena glasom', c:'Isto polje menja postojeći termin kad kažeš šta se menja: \"Petra Petrovića pomeri na 12\", \"Golf 7 prebaci sa sutra na četvrtak u 9\", \"Marko dolazi u 11 umesto u 10\", \"Petru promeni cenu na 5000\". Menja se samo rečeno, termin se odmah čuva (i u Google kalendaru), a gore piše šta je bilo i šta je sada. Ako odgovara više termina, izabereš koji; ako nijedan, tekst ostaje u polju.' },
     { t:'Otkazano', c:'Termin se otkazuje glasom (\"otkaži Petra\", \"Petar je otkazao\") ili dugim pritiskom na karticu → Otkaži termin. Otkazan termin ide u Otkazano sa svim podacima i briše se iz Google kalendara. U Završenom traka gore pokazuje zbir upisanih cena (termini bez cene se samo prebroje); dodir na nju bira Sve, godinu ili mesec, a spisak pokazuje samo taj period. U Otkazanom: prevuci udesno → Vrati (termin kome je prošlo vreme otvara kalendar za nov dan i vreme), ili drži prst za označavanje (Vrati u zakazane / Obriši). Kad klijent ponovo pozove, izdiktiraj nov termin: aplikacija ponudi da vrati njega sa svim podacima.' },
     { t:'Ispravka', c:'Dodir na karticu otvara termin preko celog ekrana. Natpis je u samom polju; polja koja nisu uneta imaju crven okvir. Dole su Slikaj · Galerija · Obriši (termin ide u korpu) · Otkaži · Sačuvaj; Sačuvaj je bled dok ništa nije promenjeno. Dug pritisak (drži prst) na kartici otvara brzi meni: Izmeni ili Obriši.' },
-    { t:'Slike vozila', c:'U terminu gore je slika auta. Slikaj otvara kameru (više slika zaredom, pa Gotovo), Galerija bira više slika odjednom. Prevuci prstom za sledeću sliku — slike idu u krug (posle poslednje opet prva); dodir na sliku otvara pregled preko celog ekrana (dva prsta uvećavaju, 🗑 briše, „★ Postavi kao profilnu“ bira sliku koja je prva). U pregledu gore, pored broja slika, je polje za naziv slike: dodirni i upiši (npr. „Oštećenje — zadnji branik“), Enter ili listanje čuva odmah; naziv se vidi na slici u terminu i u hotel kartici. Slike pripadaju autu, ne terminu: novi termin istog auta (iz Završenog ili „Vrati njega“) ima iste slike, pa oštećenja dodaješ ili brišeš kad se stanje promeni. Na početnom ekranu slika se ne vidi. Slike idu i u rezervnu kopiju.' },
+    { t:'Slike vozila', c:'U terminu gore je slika auta. Slikaj otvara kameru (više slika zaredom, pa Gotovo), Galerija bira više slika odjednom. Prevuci prstom za sledeću sliku — slike idu u krug (posle poslednje opet prva); u pregledu 📍 Strelica: dodirni mesto na slici (vrh strelice), prevuci kružić da je okreneš, Sačuvaj — strelica se čuva odmah, pripada toj slici i vidi se i na umanjenoj slici (Ukloni strelicu je briše); dodir na sliku otvara pregled preko celog ekrana (dva prsta uvećavaju, 🗑 briše, „★ Postavi kao profilnu“ bira sliku koja je prva). U pregledu gore, pored broja slika, je polje za naziv slike: dodirni i upiši (npr. „Oštećenje — zadnji branik“), Enter ili listanje čuva odmah; naziv se vidi na slici u terminu i u hotel kartici. Slike pripadaju autu, ne terminu: novi termin istog auta (iz Završenog ili „Vrati njega“) ima iste slike, pa oštećenja dodaješ ili brišeš kad se stanje promeni. Na početnom ekranu slika se ne vidi. Slike idu i u rezervnu kopiju.' },
     { t:'Registracija', c:'Polje Registracija je u redu sa prečnikom; tastatura se otvara sa velikim slovima. Može i glasom („…Golf 7, NS 123 AB“), a po izgovorenoj registraciji aplikacija prepoznaje i stari auto iz Završenog. Kad dodaš slike, a polje je prazno, AI pročita tablicu sa slike i upiše je — proveri je, može da se ispravi. Pretraga nalazi auto po registraciji bez obzira na razmake i crtice („ns123ab“ = „NS 123-AB“) i po onome što je AI video na slikama (boja, felne, oštećenja).' },
     { t:'Napomena', c:'Napomena je poslednje polje i zauzima ostatak ekrana. Dodir na nju otvara je preko celog ekrana, kao beležnicu: gore ‹ ↶ ↷ Sačuvaj. Sačuvaj ili korak nazad čuvaju SAMO napomenu i vraćaju termin; ako si promenio i nešto drugo, dole Sačuvaj ostaje upaljeno dok i to ne sačuvaš (nov termin čuva napomenu kad ga sačuvaš).' },
     { t:'Zauzeti sati', c:'U panelu „U koliko sati?“ sat u kome tog dana već ima zakazan termin je obojen i ima mali broj termina u uglu. Kad izabereš sat, ispod minuta piše ime klijenta koji je u to vreme, a ispod je spisak svih termina tog sata. Zauzeto može i dalje da se izabere (dva auta u isto vreme).' },
