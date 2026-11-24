@@ -1166,17 +1166,27 @@ input:where(:not([type=checkbox],[type=radio],[type=file])):focus, textarea:focu
 .hk-tabs button small{ display:block; font-size:12px; font-weight:600; opacity:.8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .hk-tabs button.on{ background:var(--green-deep); color:var(--on-accent); border-color:transparent; }
 .zf.hk.nap-full .hk-tabs{ display:none !important; }
-/* v73 (Zoran 24.11.): kartica kao fascikla — jezičci; Klijent na krem listu, Finansije na eukaliptus zelenom */
-.hk-tabs{ padding:10px 10px 0 !important; gap:6px !important; border-bottom:none !important; position:relative; z-index:2; }
-.hk-tabs button{ border-radius:18px 18px 0 0 !important; min-height:56px; border:1.5px solid var(--line) !important; border-bottom:none !important; margin-bottom:-1px; transition:opacity .15s, transform .15s; }
+/* v74 (Zoran 24.11., opcija A): Klijent i Finansije = dva uokvirena polja, svako u boji svog lista; izabrano debelim tamnim okvirom */
+.hk-tabs{ padding:12px 14px 10px !important; gap:10px !important; border-bottom:none !important; position:relative; z-index:2; }
+.hk-tabs button{ border-radius:16px !important; min-height:60px; margin:0 !important; border:2px solid var(--line) !important; box-shadow:0 1px 3px rgba(0,0,0,.08); transition:opacity .15s; }
 .hk-tabs button:nth-child(1){ background:var(--kl-bg) !important; color:var(--text) !important; }
 .hk-tabs button:nth-child(2){ background:var(--fin-bg) !important; color:var(--fin-deep) !important; border-color:var(--fin-line) !important; }
-.hk-tabs button:not(.on){ opacity:.55; transform:translateY(5px); }
-.hk-tabs button.on{ opacity:1; box-shadow:0 -2px 6px rgba(0,0,0,.08); }
-.hk-tabs button.on::after{ content:''; display:block; height:4px; margin:5px 30% 0; border-radius:3px; background:currentColor; }
-.zf.hk .zf-body.hk-on-p, .zf.hk .zf-body.hk-on-f{ margin:0 10px; }
-.zf.hk .zf-body.hk-on-p{ background:var(--kl-bg); border-top:1.5px solid var(--line); }
-.zf.hk .zf-body.hk-on-f{ background:var(--fin-bg); border-top:1.5px solid var(--fin-line); }
+.hk-tabs button:not(.on){ opacity:.6; }
+.hk-tabs button.on{ opacity:1; }
+.hk-tabs button.on:nth-child(1){ border:3px solid var(--text) !important; }
+.hk-tabs button.on:nth-child(2){ border:3px solid var(--fin-deep) !important; }
+.hk-tabs button:nth-child(1) small{ font-size:17px !important; font-weight:800 !important; opacity:1 !important; color:var(--text); }   /* ime klijenta veće */
+.zf.hk .zf-body.hk-on-p, .zf.hk .zf-body.hk-on-f{ margin:0 10px; border-radius:18px 18px 0 0; }
+.zf.hk .zf-body.hk-on-p{ background:var(--kl-bg); border:2px solid var(--line); border-bottom:none; }
+.zf.hk .zf-body.hk-on-f{ background:var(--fin-bg); border:2px solid var(--fin-line); border-bottom:none; }
+.zf.hk #hkPic{ margin:16px 0 18px !important; }   /* slika odvojena od polja i pločica */
+/* zaglavlje: ceo naslov „Hotel br. N“, broj zamena u istom redu, AI malo okruglo dugme */
+.hk .ff-head{ gap:8px; }
+.hk .ff-head h2{ flex:none !important; white-space:nowrap; overflow:visible !important; text-overflow:clip !important; }
+.hk-ai{ width:44px !important; height:44px !important; padding:0 !important; justify-content:center; border-radius:50% !important; margin-left:auto !important; margin-right:4px !important; font-size:20px !important; position:relative; flex:none; }
+.hk-ai span{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+.hk-ai:not(.on){ border-style:solid !important; opacity:.6; }
+.hk-ai:not(.on)::after{ content:''; position:absolute; left:8px; right:8px; top:50%; height:2.5px; background:#B03A2E; transform:rotate(-40deg); border-radius:2px; }
 .zf.hk .zf-body.hk-on-f .hk-sum{ background:color-mix(in srgb, var(--fin-deep) 20%, transparent) !important; }
 .zf.hk .hf-list{ background:transparent !important; padding:0 !important; }
 /* sezona = deo prve pločice; svaki red svoja pločica, isti razmak svuda */
@@ -4040,7 +4050,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 73; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 74; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
