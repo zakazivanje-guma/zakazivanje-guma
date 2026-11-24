@@ -1079,6 +1079,9 @@ input:where(:not([type=checkbox],[type=radio],[type=file])):focus, textarea:focu
   --sez-z-bar:#4A7FB5; --sez-z-row:color-mix(in srgb, #5B8FC9 10%, var(--bg-card));
   --fin-bg:color-mix(in srgb, #7FAF9C 32%, var(--bg-card)); --fin-line:color-mix(in srgb, #4F8C78 55%, var(--line)); --fin-deep:color-mix(in srgb, #244F43 85%, var(--text));   /* v73: eukaliptus (Finansije) */
   --kl-bg:color-mix(in srgb, var(--bg) 45%, var(--bg-card)); }
+/* v73: tamne teme — čitljiva letnja traka i jezičak Finansije */
+[data-theme="ponoc"], [data-theme="crna"]{ --sez-l:color-mix(in srgb, #F6C915 26%, var(--bg-card)); --sez-l-row:color-mix(in srgb, #F6C915 13%, var(--bg-card));
+  --sez-l-t:#F7DC6F; --sez-l-line:color-mix(in srgb, #F6C915 45%, var(--line)); --fin-bg:color-mix(in srgb, #7FAF9C 20%, var(--bg-card)); --fin-deep:#A8DCC6; }
 /* v44 hotel: spisak u temi početnog ekrana, veća oznaka 🏨, leto/zima u kartici i finansijama */
 .modal.form-full.hl{ background:var(--bg); }
 .hl .ff-head{ border-bottom:1px solid var(--line); }
