@@ -3253,7 +3253,7 @@ function hkFinHtml(){
   return '<div class="hf-list" id="hfList">'+f.map((r,i)=>'<div class="hf-grp '+(sz(r).tip==='zimska'?'z':'l')+(hkSelSet && hkSelSet.has(i)?' on':'')+'" data-i="'+i+'">'+head(r)+'<div class="hf-row '+(sz(r).tip==='zimska'?'z':'l')+(r.tid && getItem(r.tid)?' hf-t':'')+'" data-i="'+i+'"><span class="hf-mk">✓</span>'+
       (r.tid && getItem(r.tid) ? '<div class="hf-tag">📅 iz termina — izmena menja i termin</div>' : '')+
       '<div class="zf-row">'+fld(i,'datum','Datum','flex:0 0 38%','type="date"')+fld(i,'hotel','Hotel','',''+'type="text" inputmode="numeric" '+F)+fld(i,'zamena','Zamena','','type="text" inputmode="numeric" '+F)+'</div>'+
-      '<div class="zf-row"><div class="field hf-nap" onclick="expandHkNap('+i+')"><label>Napomena</label><div class="hf-nap-t">'+(r.napomena ? escapeHtml(r.napomena) : '<span class="ph">dodirni za upis</span>')+'</div></div></div></div></div>').join('')+
+      '<div class="zf-row"><div class="field hf-nap" onclick="expandHkNap('+i+')"><label>Napomena</label><div class="hf-nap-t">'+(r.napomena ? escapeHtml(r.napomena) : '')+'</div></div></div></div></div>').join('')+
     (f.length ? '' : '<div class="hs-empty">Još nema plaćanja.</div>')+
     '</div>';
 }
@@ -4200,7 +4200,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 77; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 78; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
