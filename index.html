@@ -1193,8 +1193,6 @@ input:where(:not([type=checkbox],[type=radio],[type=file])):focus, textarea:focu
 .hk .ff-head h2{ flex:none !important; white-space:nowrap; overflow:visible !important; text-overflow:clip !important; }
 .hk-ai{ width:44px !important; height:44px !important; padding:0 !important; justify-content:center; border-radius:50% !important; margin-left:auto !important; margin-right:4px !important; font-size:20px !important; position:relative; flex:none; }
 .hk-ai span{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
-.hk-ai:not(.on){ border-style:solid !important; opacity:.6; }
-.hk-ai:not(.on)::after{ content:''; position:absolute; left:8px; right:8px; top:50%; height:2.5px; background:#B03A2E; transform:rotate(-40deg); border-radius:2px; }
 .zf.hk .zf-body.hk-on-f .hk-sum{ background:color-mix(in srgb, var(--fin-deep) 20%, transparent) !important; }
 .zf.hk .hf-list{ background:transparent !important; padding:0 !important; }
 /* sezona = deo prve pločice; svaki red svoja pločica, isti razmak svuda */
@@ -1253,6 +1251,16 @@ input:where(:not([type=checkbox],[type=radio],[type=file])):focus, textarea:focu
 .hk-ai:not(.on){ background:transparent; border:1.5px dashed var(--line); color:var(--text-dim); box-shadow:none; }
 .hk-ai.busy{ animation:hkAiPuls 1s ease-in-out infinite; }
 @keyframes hkAiPuls{ 50%{ opacity:.55; } }
+.hk-sel-m h2{ margin:0 0 6px; }
+.hk-sel-p{ font-size:14.5px; color:var(--text-dim); line-height:1.45; margin:0 0 14px; }
+.hk-sel-g{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:0 0 18px; }
+.hk-sel-t{ position:relative; padding:0; border:3px solid transparent; border-radius:14px; overflow:hidden; aspect-ratio:1/1; background:var(--line); cursor:pointer; }
+.hk-sel-t img{ width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; }
+.hk-sel-t .hk-sel-k{ position:absolute; top:6px; right:6px; width:30px; height:30px; border-radius:50%; background:rgba(255,255,255,.85); border:2px solid #fff; color:transparent; font-weight:900; font-size:17px; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 4px rgba(0,0,0,.3); }
+.hk-sel-t.on{ border-color:var(--green-deep); }
+.hk-sel-t.on .hk-sel-k{ background:var(--green-deep); color:#fff; }
+.hk-sel-t:not(.on) img{ opacity:.8; }
+#hkSelGo:disabled{ opacity:.45; }
 .hk .hk-sez-t{ display:flex; align-items:center; justify-content:space-between; }
 .hk .hk-god{ display:flex; align-items:center; gap:6px; text-transform:none; letter-spacing:0; }
 .hk .hk-god label{ font-size:11.5px; font-weight:800; margin:0; }
@@ -1939,7 +1947,7 @@ function picHK(){ return !!(hkDraft && document.getElementById('hkBackdrop')); }
 function picArr(){ if(picHK()) return hkDraft.slike || (hkDraft.slike = []); return formDraft ? formDraft.slike : []; }
 function picAfter(){ if(picHK()){ hkPush(); renderHotelCard(); } else { fhPush(); renderItemForm(); } }
 function addPicsToDraft(arr){
-  if(picHK()){ if(!arr.length) return; const before = hkDraft.slike.length; hkDraft.slike = hkDraft.slike.concat(arr); hkPicIdx = before; hkPush(); hkTab = 'p'; renderHotelCard(); hkAiCitaj(arr); return; }   /* v70: nova slika → strana Klijent (da se vidi) */
+  if(picHK()){ if(!arr.length) return; const before = hkDraft.slike.length; hkDraft.slike = hkDraft.slike.concat(arr); hkPicIdx = before; hkPush(); hkTab = 'p'; renderHotelCard(); return; }   /* v70: nova slika → strana Klijent (da se vidi) */
   if(!formDraft || !arr.length) return;
   const before = formDraft.slike.length;
   formDraft.slike = formDraft.slike.concat(arr);
@@ -3118,17 +3126,43 @@ document.addEventListener('focusout', (e)=>{ const k = urKey(e.target); if(!k ||
 /* v58 (Zoran 20.11.): AI čita gumu (i tablicu) sa slike dodate u hotel karticu i sam popunjava PRAZNA polja — kao tablica u terminu.
    Proba 20.11. (guma-proba.html): brži model tačno pročitao obe gume i sa loših slika iz daljine. Sezona samo po oznaci:
    3PMSF → zimske, bez zimskih oznaka i čitljivo → letnje; inače ne upisuje dimenziju (pogrešan okvir je gora greška od praznog).
-   Prekidač 🤖 AI u zaglavlju kartice (zg:hkAi = '0' isključeno; važi za sve kartice). */
+   (Prekidač 🤖 AI ukinut u v76 — vidi ispod.) */
 let hkAiRun = 0, hkAiMarks = new Set();
-function hkAiOn(){ const v = lsGet('zg:hkAi'); return !(v && v.value === '0'); }
+/* v76 (Zoran 27.11.): AI više NE čita sam — Zoran označi slike na kojima ima šta da se pročita (tablica, guma), pa
+   „Pročitaj označene“. Prekidač zg:hkAi ukinut. Jedna slika u kartici → čita se odmah, bez biranja. */
 function hkAiBtn(){
-  const on = hkAiOn(), busy = hkAiRun > 0;
-  return '<button type="button" class="hk-ai'+(on?' on':'')+(busy?' busy':'')+'" id="hkAiBtn" onclick="hkAiToggle()" aria-label="AI čita slike">'+(busy?'⏳':'🤖')+'<span>'+(on?'AI':'AI isklj.')+'</span></button>';
+  const busy = hkAiRun > 0;
+  return '<button type="button" class="hk-ai on'+(busy?' busy':'')+'" id="hkAiBtn" onclick="hkAiIzbor()" aria-label="AI pročita izabrane slike">'+(busy?'⏳':'🤖')+'<span>AI</span></button>';
 }
-function hkAiToggle(){
-  const on = !hkAiOn(); lsSet('zg:hkAi', on ? '1' : '0');
-  const b = document.getElementById('hkAiBtn'); if(b) b.outerHTML = hkAiBtn();
-  showNote(on ? 'AI čita slike: UKLJUČENO — gume i tablica se upisuju sami u prazna polja.' : 'AI čita slike: ISKLJUČENO — slike se samo čuvaju.');
+let hkAiSel = new Set(), hkAiSelFn = null;
+function hkAiIzbor(){
+  if(!hkDraft) return;
+  if(hkAiRun > 0){ showNote('AI još čita — sačekaj.'); return; }
+  if(!getApiKey()){ showNote('Nema AI ključa — upiši ga u Podešavanjima.', {warn:true}); return; }
+  const p = hkPics();
+  if(!p.length){ showNote('Nema slika — prvo Slikaj ili Galerija.'); return; }
+  if(p.length === 1){ showNote('AI čita sliku…'); hkAiCitaj(p); return; }
+  hkAiSel = new Set();
+  const b = document.createElement('div'); b.className = 'modal-backdrop'; b.id = 'hkAiSel';
+  b.innerHTML = '<div class="modal hk-sel-m"><h2 class="serif">🤖 Šta da AI pročita?</h2>'+
+    '<p class="hk-sel-p">Dodirni slike sa <b>tablicom</b> ili <b>gumom</b>. Upisuje samo u prazna polja.</p>'+
+    '<div class="hk-sel-g">'+p.map((u,i)=>'<button type="button" class="hk-sel-t" data-i="'+i+'" onclick="hkAiSelTap('+i+')"><img src="'+u+'" draggable="false"><span class="hk-sel-k">✓</span></button>').join('')+'</div>'+
+    '<div class="modal-actions"><button class="cancel-btn" onclick="closeOverlay(hkAiSelFn)">Otkaži</button><button class="save-btn" id="hkSelGo" onclick="hkAiSelGo()" disabled>Pročitaj</button></div></div>';
+  document.body.appendChild(b);
+  b.addEventListener('click', (e)=>{ if(e.target === b) closeOverlay(hkAiSelFn); });
+  hkAiSelFn = ()=>{ const x = document.getElementById('hkAiSel'); if(x) x.remove(); hkAiSelFn = null; };
+  pushOverlay(hkAiSelFn);
+}
+function hkAiSelTap(i){
+  if(hkAiSel.has(i)) hkAiSel.delete(i); else hkAiSel.add(i);
+  const t = document.querySelector('#hkAiSel .hk-sel-t[data-i="'+i+'"]'); if(t) t.classList.toggle('on', hkAiSel.has(i));
+  const g = document.getElementById('hkSelGo'), n = hkAiSel.size;
+  if(g){ g.disabled = !n; g.textContent = n ? 'Pročitaj ('+n+')' : 'Pročitaj'; }
+}
+function hkAiSelGo(){
+  const p = hkPics(), arr = [...hkAiSel].sort((a,b)=>a-b).map(i=>p[i]).filter(Boolean);
+  closeOverlay(hkAiSelFn);
+  if(arr.length){ showNote('AI čita '+arr.length+' '+(arr.length===1?'sliku':'slike')+'…'); hkAiCitaj(arr); }
 }
 const HK_AI_SCHEMA = { type:'object', properties:{
   tablica:{type:'string'}, dimenzija:{type:'string'}, proizvodjac:{type:'string'}, model:{type:'string'},
@@ -3141,11 +3175,11 @@ const HK_AI_SYS = 'Na slici je auto ili guma u vulkanizerskoj radnji u Srbiji. P
   'sezona: "zimska" ako se vidi 3PMSF; "celogodisnja" ako piše All Season / 4 Seasons; "letnja" ako nema zimskih oznaka a natpisi su jasno čitljivi; "nepoznato" inače. '+
   'dot: poslednje 4 cifre DOT oznake (npr. "2321") samo ako se jasno vide.';
 async function hkAiCitaj(arr){
-  if(!hkAiOn() || !getApiKey() || !hkDraft || !arr || !arr.length) return;
+  if(!getApiKey() || !hkDraft || !arr || !arr.length) return;
   const draft = hkDraft; hkAiRun++; hkAiBtnRefresh();
   const upisano = [], nejasno = [];
   try{
-    for(const pic of arr.slice(0, 4)){
+    for(const pic of arr.slice(0, 8)){
       const parts = await picParts([pic], 1600, 0.88);
       let r;
       try{ r = await geminiStructuredRequest(HK_AI_SYS, parts, HK_AI_SCHEMA, 2048, 30000); }
@@ -3169,6 +3203,7 @@ async function hkAiCitaj(arr){
   }
   if(hkDraft !== draft) return;
   if(upisano.length){ hkPush(); hkBar(); }
+  if(!upisano.length && !nejasno.length) showNote('AI nije našao ništa novo za upis (polja su već popunjena ili se ne vidi jasno).');
   if(upisano.length || nejasno.length)
     showNote(upisano.length ? 'AI je popunio polja sa slike — proveri zeleno označena.'+(nejasno.length ? ' Sezona druge gume nije jasna.' : '')
                             : 'Sezona gume nije jasna sa slike — upiši sam.', nejasno.length && !upisano.length ? {warn:true} : undefined);
@@ -4161,7 +4196,7 @@ function calUi(){
 if(calCfg().on) calLoadGis();
 
 /* ---------- OBRAZAC (novi termin / izmena) ---------- */
-const APP_VERSION = 75; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
+const APP_VERSION = 76; /* svaka objava: +1, isti broj u linku ?v=N i u keš imenu sw.js */
 /* v45: modeli po zvaničnom spisku (ai.google.dev/gemini-api/docs/models i /deprecations, 13.10.2026). gemini-3.5-flash je povučen
    (Google ga sam preusmerava na gemini-3.6-flash), zato sada pišemo tačan naziv. Svaki posao ima rezervni model; oba podržavaju
    pretragu interneta (google_search). */
@@ -5895,7 +5930,7 @@ function openHelpScreen(){
     { t:'Telefon i SMS', c:'Na kartici je broj napisan čitljivo (063 880 8260). U terminu: kad je polje prazno, 📞 otvara Telefon na spisku poziva (kopiraš broj, 📋 ga nalepi); kad je broj upisan, 📞 zove klijenta, a 💬 otvara Poruke sa gotovim podsetnikom („Poštovani, podsećamo Vas na termin za zamenu guma sutra u 12:00. Tire Time“) — samo dodirneš Pošalji. Kad broja nema, 📞 otvara Telefon (da prepišeš broj iz poziva), a 📋 nalepi kopirani broj.' },
     { t:'Hotel za gume', c:'Kvadrat 🏨 Hotel otvara spisak klijenata čije gume čuvaš, po grupama (svaka grupa na svojoj tamnijoj traci; kvadrati i traka sezone gore stoje, pomera se samo spisak): ⚠ Sporno (crveno, npr. nije došao na zamenu), Čekaju zamenu (broj u boji polja vremena) i ✓ Zamenjeno ove sezone (zeleno). Gore su kvadrati kao na početnom ekranu: Novi (nov hotel klijent), Pretraži (otvara polje za pretragu) i Završeno (klijenti čije gume više ne čuvamo, po mesecima; ponovni dodir ili korak nazad vraća spisak) i Excel (ceo hotel u Excel fajl u Preuzimanjima, uređen kao aplikacija: list Hotel po grupama Sporno / Čekaju zamenu / Zamenjeno / Završeno, list Finansije po klijentu sa sezonama u boji i zbirom; fajl deliš iz programa kojim ga otvaraš — Pošalji kao datoteku — ili iz Preuzimanja). Prevuci klijenta udesno → Završeno: ide u Završeno, a njegovo mesto je slobodno. U Završenom prevuci udesno → Vrati u hotel (ako je mesto u međuvremenu zauzeto, otvori se kartica da upišeš novo). Ispod kvadrata piše sezona (zimska 1.10.–kraj februara, letnja 1.3.–30.9.) i koliko je zamenjeno. Broj u kvadratu je mesto gde su gume. Pretraga po imenu, registraciji, dimenziji, brendu, adresi ili broju. Dodavanje: kvadrat Novi → izaberi klijenta iz termina (ili prazna kartica); ili u otvorenom terminu dugme „🏨 U hotel“ na slici; ili dugi pritisak na termin → 🏨 U hotel za gume. Uklanjanje: prevuci klijenta u spisku ulevo → Izbriši (pita pre brisanja) — kartica ide u korpu (Podešavanja → Korpa), odakle se vraća dugmetom Vrati, sa svim podacima i starim redovima.' },
     { t:'Privremena kasa', c:'Kvadrat Kasa na početnom ekranu otvara Privremenu kasu — beležnicu naplaćenog dok novac ne odneseš u pravu kasu. Dole upiši iznos (i za šta, ne mora), pa široko dugme ➤ ili Enter; gore je ukupan zbir i broj naplata. Dodir na red vraća ga u polja za izmenu (✓ čuva, ponovni dodir na red odustaje); prevuci red ulevo → Izbriši (ide u korpu). Kad predaš novac, gore Predato (pored ✕) → potvrda: spisak se prazni, a cela predaja ide u korpu i odatle može da se vrati. Nije povezana sa terminima ni hotelom; ulazi u rezervnu kopiju.' },
-    { t:'Hotel kartica', c:'U naslovu, pored broja hotela, piše koliko je zamena izvršeno (redovi finansija sa iznosom Zamena i završeni termini). Kartica je kao fascikla sa dva lista: 👤 Klijent i gume (krem; slike i podaci) i 💰 Finansije (zeleno) — jezičci ispod naslova, na jezičku Finansije piše datum poslednjeg reda. Prevuci levo ili desno bilo gde van slike → drugi list, u krug (prevlačenje po slici lista slike). Jedno Sačuvaj i ↶ ↷ važe za obe strane. Duga adresa: dodir raširi polje preko celog reda da se vidi cela; izlazak ga vraća u jedan red. 🤖 AI gore: kad dodaš sliku, AI pročita gumu (dimenzija, brend, godina — u okvir po oznaci 3PMSF) i tablicu i upiše ih samo u prazna polja, zeleno označeno — proveri; dodir na 🤖 isključuje/uključuje čitanje. God. = godina proizvodnje gume (DOT). Dole su 📷 Slikaj i 🖼️ Galerija (slike vozila idu u karticu), zatim Zakaži, Zamena sezone, Otkaži i Sačuvaj. Redom: Ime i prezime | Adresa, Telefon | Mesto (broj gde su gume), Auto | Registracija; zatim žuti okvir ☀️ Letnje i plavi ❄️ Zimske — svaki sa Dimenzija | Brend | Felna (dimenziju kucaš samo ciframa na brojevnoj tastaturi, npr. 2156517 → 215/65 R17; dodir na Alu ili Čelik označi kvačicom, ponovni dodir skida; bez oznake = bez felne); pa Status (Aktivan, ⚠ Sporno, ✓ Završeno), „Kod nas su: letnje / zimske / ništa“, U hotelu od | Cena mesečno i Napomena. Gore su slike auta, iste kao u terminima: 📷 Slikaj i 🖼️ Galerija dodaju slike direktno u kartici, dodir na sliku otvara pregled (★ profilna, 🗑 briše); sve se čuva dugmetom Sačuvaj. Polja rade kao u terminu: dodir isprazni polje, a stari tekst se vidi osenčen (kucanje ili diktat upisuje novo, drugi dodir vraća stari tekst za ispravku, Backspace u praznom polju = korak nazad u prethodno polje, strelica na tastaturi = sledeće polje). Napomena se otvara preko celog ekrana kao u terminu (↶ ↷ Sačuvaj; nazad čuva samo napomenu, ostale izmene čekaju Sačuvaj). Ispod su finansije: zbir hotel, zamena i ukupno (Ukupno istaknuto tamno, na tamnijoj traci); redovi su po sezonama (traka sa nazivom sezone i zbirom; zima plavo, leto žuto, po datumu reda), i svaki red kao polja Datum, Hotel, Zamena i Napomena — dodir na polje i menjaš direktno, zbir se odmah preračuna; ＋ Dodaj red (gore, ispod zbira) dodaje nov red na vrh (korak nazad dok je prazan = odustaneš od reda); svaki red je svoja pločica, traka sezone sa zbirom je samo na prvoj pločici te sezone. Brisanje: dugi pritisak na red → označavanje (dodir označava još redova, Označi sve; ✕ ili nazad prekida), dole 🗑 Obriši označeno → potvrda; ↶ vraća, a na Sačuvaj obrisani redovi idu u korpu (Podešavanja → Korpa → Vrati ih vraća u karticu). Red sa oznakom „📅 iz termina“ je završen termin, trajno upisan u karticu: izmena tu menja i taj termin (iznos = hotel + zamena) i obrnuto. Hotel je trajna evidencija: brisanje termina (i iz Završenog ili korpe) NE briše red u hotelu — red se briše samo ovde, i tada na Sačuvaj i njegov termin iz Završenog ide u korpu zajedno sa redom. Jedino kad termin vratiš iz Završenog u zakazane (greškom označen kao urađen), njegov red sam nestaje. Dole: 📅 Zakaži (kartica se sačuva, pa kalendar i sat, pa nov termin sa podacima kartice — upisuje se na Sačuvaj), Zamena sezone (letnje ↔ zimske; red u finansije upisuješ sam), Otkaži, Sačuvaj.' },
+    { t:'Hotel kartica', c:'U naslovu, pored broja hotela, piše koliko je zamena izvršeno (redovi finansija sa iznosom Zamena i završeni termini). Kartica je kao fascikla sa dva lista: 👤 Klijent i gume (krem; slike i podaci) i 💰 Finansije (zeleno) — jezičci ispod naslova, na jezičku Finansije piše datum poslednjeg reda. Prevuci levo ili desno bilo gde van slike → drugi list, u krug (prevlačenje po slici lista slike). Jedno Sačuvaj i ↶ ↷ važe za obe strane. Duga adresa: dodir raširi polje preko celog reda da se vidi cela; izlazak ga vraća u jedan red. 🤖 AI gore: AI ne čita slike sam — dodir na 🤖 otvori slike kartice, označiš one na kojima je tablica ili guma i dodirneš Pročitaj (kad je u kartici samo jedna slika, čita je odmah). AI pročita gumu (dimenzija, brend, godina — u okvir po oznaci 3PMSF) i tablicu i upiše ih samo u prazna polja, zeleno označeno — proveri, pa Sačuvaj. God. = godina proizvodnje gume (DOT). Dole su 📷 Slikaj i 🖼️ Galerija (slike vozila idu u karticu), zatim Zakaži, Zamena sezone, Otkaži i Sačuvaj. Redom: Ime i prezime | Adresa, Telefon | Mesto (broj gde su gume), Auto | Registracija; zatim žuti okvir ☀️ Letnje i plavi ❄️ Zimske — svaki sa Dimenzija | Brend | Felna (dimenziju kucaš samo ciframa na brojevnoj tastaturi, npr. 2156517 → 215/65 R17; dodir na Alu ili Čelik označi kvačicom, ponovni dodir skida; bez oznake = bez felne); pa Status (Aktivan, ⚠ Sporno, ✓ Završeno), „Kod nas su: letnje / zimske / ništa“, U hotelu od | Cena mesečno i Napomena. Gore su slike auta, iste kao u terminima: 📷 Slikaj i 🖼️ Galerija dodaju slike direktno u kartici, dodir na sliku otvara pregled (★ profilna, 🗑 briše); sve se čuva dugmetom Sačuvaj. Polja rade kao u terminu: dodir isprazni polje, a stari tekst se vidi osenčen (kucanje ili diktat upisuje novo, drugi dodir vraća stari tekst za ispravku, Backspace u praznom polju = korak nazad u prethodno polje, strelica na tastaturi = sledeće polje). Napomena se otvara preko celog ekrana kao u terminu (↶ ↷ Sačuvaj; nazad čuva samo napomenu, ostale izmene čekaju Sačuvaj). Ispod su finansije: zbir hotel, zamena i ukupno (Ukupno istaknuto tamno, na tamnijoj traci); redovi su po sezonama (traka sa nazivom sezone i zbirom; zima plavo, leto žuto, po datumu reda), i svaki red kao polja Datum, Hotel, Zamena i Napomena — dodir na polje i menjaš direktno, zbir se odmah preračuna; ＋ Dodaj red (gore, ispod zbira) dodaje nov red na vrh (korak nazad dok je prazan = odustaneš od reda); svaki red je svoja pločica, traka sezone sa zbirom je samo na prvoj pločici te sezone. Brisanje: dugi pritisak na red → označavanje (dodir označava još redova, Označi sve; ✕ ili nazad prekida), dole 🗑 Obriši označeno → potvrda; ↶ vraća, a na Sačuvaj obrisani redovi idu u korpu (Podešavanja → Korpa → Vrati ih vraća u karticu). Red sa oznakom „📅 iz termina“ je završen termin, trajno upisan u karticu: izmena tu menja i taj termin (iznos = hotel + zamena) i obrnuto. Hotel je trajna evidencija: brisanje termina (i iz Završenog ili korpe) NE briše red u hotelu — red se briše samo ovde, i tada na Sačuvaj i njegov termin iz Završenog ide u korpu zajedno sa redom. Jedino kad termin vratiš iz Završenog u zakazane (greškom označen kao urađen), njegov red sam nestaje. Dole: 📅 Zakaži (kartica se sačuva, pa kalendar i sat, pa nov termin sa podacima kartice — upisuje se na Sačuvaj), Zamena sezone (letnje ↔ zimske; red u finansije upisuješ sam), Otkaži, Sačuvaj.' },
     { t:'Termin hotel klijenta', c:'Na kartici na početnom ekranu pored imena piše 🏨 i broj (⚠ ako je sporno). U terminu je traka „Hotel br. … · kod nas: …“ — dodir otvara hotel karticu. Iznos je podeljen: Zamena + Hotel = Ukupno; Hotel se sam predloži (meseci od prošle zamene × cena), a možeš ga promeniti. Kad termin prevučeš u Završeno, klijent prelazi u „zamenjeno ove sezone“, a kod nas se okrene (posle zimske zamene: letnje). Ako termin vratiš iz Završenog, vrati se i to.' },
     { t:'Nesačuvana izmena', c:'Ako u terminu nešto promeniš pa ga zatvoriš bez čuvanja (✕, Otkaži, dodir van ili korak nazad), aplikacija pita „Sačuvati izmene?“: Sačuvaj čuva, Otkaži izmene zatvara termin bez promene. Dodir van prozora ili korak nazad vraća u termin.' },
     { t:'↶ ↷ u terminu', c:'Dok menjaš, u donjem redu se umesto Slikaj/Galerija/Obriši (u hotel kartici Slikaj/Galerija/Zakaži) pojave široke strelice; izlazak iz polja ili dodir na sliku vraća običan red. Strelice vraćaju i ponavljaju izmene u celom terminu (polja, napomenu i slike), korak po korak. Okvir prelazi na polje koje se upravo vratilo; ako si kucao, kursor prelazi u njega (kod dugmadi kao Felna, datuma i slika okvir se samo kratko pokaže). Strelica koja trenutno radi je tamno ispunjena; bleda sa isprekidanim okvirom znači da tog koraka nema. Korak je pauza u kucanju ili diktatu, ili jedna radnja (vreme, slika). Dodir na strelicu ne zatvara tastaturu.' },
